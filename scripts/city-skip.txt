@@ -1,0 +1,101 @@
+# City names left out of cities.js. One per line, exact spelling.
+# Common words and people's names would pin unrelated headlines; other names are better known as
+# somewhere else, or stand for a government ("Washington says...").
+# Common words
+Split
+Nice
+Male
+Ogre
+Plaque
+Golfe
+Noord
+Bender
+Oral
+Swords
+Bray
+Carrefour
+Mango
+Bimbo
+Liang
+Woodlands
+Queens
+The Valley
+West Bay
+West Island
+Central Coast
+Sale
+Colon
+Paraiso
+Paraíso
+Limpio
+# People's names
+Mary
+Martin
+David
+Douglas
+Kara
+Kira
+Lamin
+Nikki
+Kanye
+Kaya
+Harper
+Buchanan
+Norton
+Livingstone
+Stanley
+Hamilton
+Constantine
+Delgado
+Mercedes
+Melo
+Rivera
+Montero
+Carnot
+Linden
+Leon
+León
+Kati
+Pala
+Asker
+Kikuyu
+# Better known as somewhere else, or used for a government
+Washington
+Victoria
+Surrey
+Newcastle
+Hastings
+Plymouth
+Waterloo
+Killarney
+Freeport
+Jamestown
+Granada
+Valencia
+Gaya
+Santa Cruz
+Santa Fe
+Santa Clara
+Santa Ana
+San Pedro
+San Ignacio
+San Isidro
+San Vicente
+San Marcos
+San Miguel
+Saint John's
+Saint John’s
+Saint-Denis
+Saint-Paul
+Saint-Pierre
+Saint-Joseph
+Sainte-Marie
+Sainte-Anne
+Sainte-Rose
+La Possession
+Carolina
+Levittown
+# Three-letter words
+Man
+San
+Bar

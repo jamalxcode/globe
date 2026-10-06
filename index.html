@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Meridian</title>
+  <meta name="description" content="Live equal-area map of reported strikes and explosions, from public news and social sources.">
+  <meta name="theme-color" content="#07090c">
+  <!-- Shared by link only: ask search engines not to list or follow it. -->
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="map" aria-label="World map of reported strikes and explosions"></div>
+
+  <div class="status-wrap"><div id="status" class="status" title="Loading the news feed."><span class="dot"></span><span class="label">Loading</span></div></div>
+
+  <aside id="places-panel" class="panel panel-left">
+    <div class="panel-head">
+      <button type="button" class="icon-btn sky" data-toggle="places-panel" aria-expanded="true">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+        <span class="sr-only">Collapse featured locations</span>
+      </button>
+      <div class="panel-title"><p class="brand">MERIDIAN</p><h2>Featured locations</h2></div>
+    </div>
+    <ul class="list" data-places></ul>
+  </aside>
+
+  <aside id="feed-panel" class="panel panel-right">
+    <div class="panel-head">
+      <button type="button" class="icon-btn sky" data-toggle="feed-panel" aria-expanded="true">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/></svg>
+        <span class="sr-only">Collapse live feed</span>
+      </button>
+      <div class="panel-title"><h2>Live feed</h2></div>
+    </div>
+    <div class="filters" data-filters></div>
+    <ul class="list" data-feed></ul>
+  </aside>
+
+  <section class="sheet">
+    <p class="note">Unverified news and social media reports. Not for operational use.</p>
+    <div class="tabs">
+      <button type="button" data-tab="places">Places</button>
+      <button type="button" data-tab="feed" class="active">Feed</button>
+    </div>
+    <div class="sheet-body" data-sheet-body>
+      <div data-sheet="places" hidden><ul class="list" data-places></ul></div>
+      <div data-sheet="feed"><div class="filters" data-filters></div><ul class="list" data-feed></ul></div>
+    </div>
+  </section>
+
+  <p class="footer-note">
+    <span class="key"><i class="amber"></i>1 source</span>
+    <span class="key"><i class="alert"></i>2+ independent sources</span>
+    <span>Unverified news and social media reports. Not for operational use.</span>
+  </p>
+
+  <article id="card" class="card" hidden></article>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+  <script src="cities.js"></script>
+  <script src="places.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
