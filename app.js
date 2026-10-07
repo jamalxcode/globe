@@ -496,10 +496,27 @@ function focusOn(lat, lng, selection) {
 }
 let focusToken = null;
 
-// Back to the whole world.
+// Back to the whole world: close the info card and the Key, clear the selection, slide away side panels that
+// aren't pinned, then zoom out.
 function resetView() {
   focusToken = null;
-  svg.transition().duration(reduceMotion ? 0 : 750).ease(d3.easeCubicInOut).call(zoom.transform, d3.zoomIdentity);
+  state.cardOn = false;
+  state.selection = null;
+  setKeyOpen(false);
+  if (autoHide.matches) {
+    for (const panel of document.querySelectorAll(".panel.open:not(.pinned)")) setPanelOpen(panel, false);
+  }
+  render();
+  const duration = reduceMotion ? 0 : 750;
+  let settled = false;
+  svg.interrupt().transition().duration(duration).ease(d3.easeCubicInOut).call(zoom.transform, d3.zoomIdentity)
+    .on("end interrupt", () => { settled = true; });
+  // Animations pause in background tabs; jump there instead (unless the user grabbed the map meanwhile).
+  setTimeout(() => {
+    if (settled) return;
+    svg.interrupt();
+    svg.call(zoom.transform, d3.zoomIdentity);
+  }, duration + 150);
 }
 
 function pick(kind, id) {
