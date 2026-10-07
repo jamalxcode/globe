@@ -27,7 +27,7 @@ var MeridianExtract = (function () {
   const FIRE_TARGETS = new Set(["fuel", "power", "industry", "military", "ship", "airport", "rail"]);
 
   // A weapon alone ("drone maker opens plant") isn't an event; the headline must also say something happened.
-  const ACTION = /\b(attack(s|ed|ing)?|strikes?|struck|hit(s|ting)?|shot down|downed|intercept(s|ed|ion|ions)?|explosions?|blasts?|explod\w+|detonat\w+|kill(s|ed|ing)?|injur\w+|wound\w+|damag\w+|destroy\w+|fires?|burn(s|ing|ed)?|ablaze|blazes?|engulf\w*|flames|inferno|gutted|(breaks?|broke) out|sank|sinks?|sinking|sunk|target(s|ed|ing)|land(ed|s)? (in|on|near)|impacts?|shelling|shelled|air ?strikes?|air ?raids?|bombed|bombing|bombard\w*|casualt\w+|dead|died|victims?|pounded|hammered)\b/i;
+  const ACTION = /\b(attack(s|ed|ing)?|launch(es|ed|ing)? (\w+ )?(at|on|against|toward|towards)|strikes?|struck|hit(s|ting)?|shot down|downed|intercept(s|ed|ion|ions)?|explosions?|blasts?|explod\w+|detonat\w+|kill(s|ed|ing)?|injur\w+|wound\w+|damag\w+|destroy\w+|fires?|burn(s|ing|ed)?|ablaze|blazes?|engulf\w*|flames|inferno|gutted|(breaks?|broke) out|sank|sinks?|sinking|sunk|target(s|ed|ing)|land(ed|s)? (in|on|near)|impacts?|shelling|shelled|air ?strikes?|air ?raids?|bombed|bombing|bombard\w*|casualt\w+|dead|died|victims?|pounded|hammered)\b/i;
 
   // Headlines that use strike words for something else, or talk about what might happen.
   const NEGATIVE = /\b(on strike|strike action|strikers|workers'? strike|general strike|hunger strike|labou?r strike|walkouts?|explosive (growth|rise|increase|claims?|allegations?|report|interview|testimony)|population explosion|lawsuits?|films?|movies?|documentary|anniversary|years ago|missile tests?|tests?|tested|test[- ]?fir\w*|test[- ]?launch\w*|test flights?|acceptance firing|successfully launch\w*|first release|drills?|military exercises?|contest|parade|contracts?|arms deals?|arms sales?|sale|approved|procure\w*|budget|aid package|unveil\w*|presented|develop\w*|manufactur\w*|delivery|deliveries|supply chain|subsidiary|partnership|SpaceX|NASA|Starship|spacecraft|satellite launch|open(ed)? fire|gunfire|fire brigades?|fire season|fire risk|potential|possible|could|might|would|threat of|fears?|plot|prepar\w+|plans? to|expected|may be|risk of|projected)\b/i;
@@ -55,7 +55,7 @@ var MeridianExtract = (function () {
   }
 
   // A place right after one of these words is more likely where it happened than who did it.
-  const PLACE_CUES = new Set(["in", "on", "near", "at", "over", "into", "across", "outside", "inside", "of", "targeting", "targeted", "targets", "hit", "hits", "struck", "strikes", "strike", "attack", "attacks", "attacked", "pounds", "pounded", "bombed", "bombs", "shelled", "shells", "toward", "towards"]);
+  const PLACE_CUES = new Set(["in", "on", "near", "at", "over", "into", "across", "off", "inside", "throughout", "around", "outside", "inside", "of", "targeting", "targeted", "targets", "hit", "hits", "struck", "strikes", "strike", "attack", "attacks", "attacked", "pounds", "pounded", "bombed", "bombs", "shelled", "shells", "toward", "towards"]);
 
   // What was hit, when the headline says. First match wins, so the more specific targets come first
   // ("airport fuel depot" is an airport, "power plant" is power, not industry).
@@ -126,15 +126,32 @@ var MeridianExtract = (function () {
     return { regex: new RegExp(`(?<![\\p{L}\\p{N}])(${alternation})(?![\\p{L}\\p{N}])`, "gu"), entries };
   }
 
+  // A place followed by one of these is the speaker ("Russia says", "Moscow warns"), not where it happened.
+  // Also "Russia's army says": a possessive and one word, then the verb.
+  const SPEAKER = /^(['’]s\s+\w+)?\s+(says?|said|claims?|claimed|accuses?|accused|warns?|warned|denies|denied|vows?|vowed|threatens?|threatened|condemns?|condemned|blames?|blamed|responds?|responded|announces?|announced|confirms?|confirmed|reports?|reported|insists?|urges?|urged|demands?|retaliates?|launch(es|ed)?|fired)\b/i;
+  // Words that can sit between a cue and the place: "over southwestern Saudi Arabia", "in the occupied West Bank".
+  const BETWEEN = /\s+(the|northern|southern|eastern|western|north-?eastern|north-?western|south-?eastern|south-?western|central|occupied|coastal|far)\s*$/;
+
   // The most specific place wins; among equals, one after a cue word ("in", "hits"...), then the first.
+  // A whole country only counts with a cue ("in Russia", "hits Russia") or as "Russia's ...", so a country
+  // named as the actor ("Russia says...", "Russia-Ukraine war") doesn't pin a marker to its middle.
   function locate(matcher, text) {
     if (!text || !matcher) return null;
     let best = null;
     for (const m of text.matchAll(matcher.regex)) {
       const entry = matcher.entries.get(m[1]);
       if (!entry) continue;
-      const before = text.slice(Math.max(0, m.index - 24), m.index).toLowerCase().match(/([a-z]+)[\s,'’]*$/);
+      const after = text.slice(m.index + m[1].length, m.index + m[1].length + 30);
+      if (SPEAKER.test(after)) continue;
+      const prevChar = text[m.index - 1];
+      const nextChar = after[0];
+      if (entry.precision === "country" && (prevChar === "-" || nextChar === "-")) continue; // "Russia-Ukraine"
+      let pre = text.slice(Math.max(0, m.index - 40), m.index).toLowerCase();
+      while (BETWEEN.test(pre)) pre = pre.replace(BETWEEN, " ");
+      const before = pre.match(/([a-z]+)[\s,'’]*$/);
       const cued = before && PLACE_CUES.has(before[1]);
+      const possessive = /^['’]s\b/.test(after);
+      if (entry.precision === "country" && !cued && !possessive) continue;
       const score = RANK[entry.precision] * 10 + (cued ? 4 : 0) - m.index / 10000;
       if (!best || score > best.score) best = { ...entry, score, term: m[1] };
     }
@@ -192,8 +209,10 @@ var MeridianExtract = (function () {
     if (!kind) return null;
     // Telegram summaries often carry ads, so only news summaries help find the place, and only when they
     // name a city or region: a country in a summary is often a ship's flag or a side note.
+    // If the headline names a place but only as the actor ("Pakistan launches strikes"), don't go looking in
+    // the summary: it would find the same actor's capital.
     let place = locate(matcher, item.title);
-    if (!place && !item.social) {
+    if (!place && !item.social && !item.title.match(matcher.regex)) {
       const fromSummary = locate(matcher, item.summary || "");
       if (fromSummary && fromSummary.precision !== "country") place = fromSummary;
     }
