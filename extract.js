@@ -15,14 +15,22 @@ var MeridianExtract = (function () {
     ["airstrike", /\b(air ?strikes?|air-strikes?|air ?raids?|warplanes?|fighter jets?|bombings?|bombed|bombard\w*|glide bombs?|guided bombs?)\b/i],
     ["shelling", /\b(shelling|shelled|artillery|mortars?|MLRS|howitzers?)\b/i],
     ["explosion", /\b(explosions?|(a|the|massive|huge|large|powerful|deadly|mine|bomb|twin) blasts?|blasts? (in|at|near|rocks?|rocked|kills?|killed|heard|hits?)|exploded|detonat\w+|car bombs?|IEDs?|blew up|blown up|suicide bomb\w*)\b/i],
+    // Incidents that hit a country's land, water or resources, accident or not.
+    ["wildfire", /\b(wildfires?|wild ?land fires?|forest fires?|bush ?fires?|brush ?fires?|grass ?fires?|peat fires?|fires? (rages?|raging|spreads?|spreading) (through|across))\b/i],
+    ["environment", /\b(oil spills?|fuel spills?|chemical spills?|toxic (spills?|leaks?|clouds?)|(gas|ammonia|chlorine|chemical|radiation|radioactive) leaks?|pipeline (leaks?|ruptures?|bursts?|spills?|breach\w*)|oil (leaks?|slicks?)|dam (breach\w*|bursts?|collapses?|failures?)|(dam|levee) (breaks?|broke)|mine (collapses?|accidents?|disasters?|floods?|blasts?|explosions?)|(river|water|sea|lake|groundwater) (contaminat\w+|pollut\w+)|contaminat\w+ (of|in) (the )?(river|water|sea|lake))\b/i],
+    // Only at a facility (see FIRE_TARGETS): a refinery fire counts, a house fire doesn't.
+    ["fire", /\b(fires?|blaze|ablaze|burn(s|ing)?|flames|inferno)\b/i],
     ["other", /\b(strikes?|struck|shot down|downed|attacks? on|attacked)\b/i],
   ];
 
+  // Fires count only at these kinds of site (targets from TARGET_RULES below).
+  const FIRE_TARGETS = new Set(["fuel", "power", "industry", "military", "ship", "airport", "rail"]);
+
   // A weapon alone ("drone maker opens plant") isn't an event; the headline must also say something happened.
-  const ACTION = /\b(attack(s|ed|ing)?|strikes?|struck|hit(s|ting)?|shot down|downed|intercept(s|ed|ion|ions)?|explosions?|blasts?|explod\w+|detonat\w+|kill(s|ed|ing)?|injur\w+|wound\w+|damag\w+|destroy\w+|fires?|burn(s|ing|ed)?|ablaze|sank|sinks?|sinking|sunk|target(s|ed|ing)|land(ed|s)? (in|on|near)|impacts?|shelling|shelled|air ?strikes?|air ?raids?|bombed|bombing|bombard\w*|casualt\w+|dead|died|victims?|pounded|hammered)\b/i;
+  const ACTION = /\b(attack(s|ed|ing)?|strikes?|struck|hit(s|ting)?|shot down|downed|intercept(s|ed|ion|ions)?|explosions?|blasts?|explod\w+|detonat\w+|kill(s|ed|ing)?|injur\w+|wound\w+|damag\w+|destroy\w+|fires?|burn(s|ing|ed)?|ablaze|blazes?|engulf\w*|flames|inferno|gutted|(breaks?|broke) out|sank|sinks?|sinking|sunk|target(s|ed|ing)|land(ed|s)? (in|on|near)|impacts?|shelling|shelled|air ?strikes?|air ?raids?|bombed|bombing|bombard\w*|casualt\w+|dead|died|victims?|pounded|hammered)\b/i;
 
   // Headlines that use strike words for something else, or talk about what might happen.
-  const NEGATIVE = /\b(on strike|strike action|strikers|workers'? strike|general strike|hunger strike|labou?r strike|walkouts?|explosive (growth|rise|increase|claims?|allegations?|report|interview|testimony)|population explosion|lawsuits?|films?|movies?|documentary|anniversary|years ago|missile tests?|tests?|tested|test[- ]?fir\w*|test[- ]?launch\w*|test flights?|acceptance firing|successfully launch\w*|first release|drills?|military exercises?|contest|parade|contracts?|arms deals?|arms sales?|sale|approved|procure\w*|budget|aid package|unveil\w*|presented|develop\w*|manufactur\w*|delivery|deliveries|supply chain|subsidiary|partnership|SpaceX|NASA|Starship|spacecraft|satellite launch|potential|possible|could|might|would|threat of|fears?|plot|prepar\w+|plans? to|expected|may be|risk of|projected)\b/i;
+  const NEGATIVE = /\b(on strike|strike action|strikers|workers'? strike|general strike|hunger strike|labou?r strike|walkouts?|explosive (growth|rise|increase|claims?|allegations?|report|interview|testimony)|population explosion|lawsuits?|films?|movies?|documentary|anniversary|years ago|missile tests?|tests?|tested|test[- ]?fir\w*|test[- ]?launch\w*|test flights?|acceptance firing|successfully launch\w*|first release|drills?|military exercises?|contest|parade|contracts?|arms deals?|arms sales?|sale|approved|procure\w*|budget|aid package|unveil\w*|presented|develop\w*|manufactur\w*|delivery|deliveries|supply chain|subsidiary|partnership|SpaceX|NASA|Starship|spacecraft|satellite launch|open(ed)? fire|gunfire|fire brigades?|fire season|fire risk|potential|possible|could|might|would|threat of|fears?|plot|prepar\w+|plans? to|expected|may be|risk of|projected)\b/i;
 
   // Stories that look back at an earlier attack (features, investigations, recaps). Their publish time is new,
   // but the event isn't: "Generals were warned their Kuwait location was vulnerable. Then an Iranian drone hit".
@@ -133,11 +141,16 @@ var MeridianExtract = (function () {
     return best;
   }
 
-  function classify(title, category) {
-    if (NEGATIVE.test(title) || !ACTION.test(title)) return null;
+  // target: what the headline says was hit (detectTarget), needed to decide whether a fire counts.
+  function classify(title, category, target) {
+    if (NEGATIVE.test(title)) return null;
+    const acted = ACTION.test(title);
     for (const [type, re] of TYPE_RULES) {
       const m = title.match(re);
       if (!m) continue;
+      // A wildfire or a spill is itself the incident; everything else also needs a word saying something happened.
+      if (!acted && type !== "wildfire" && type !== "environment") continue;
+      if (type === "fire" && !FIRE_TARGETS.has(target)) continue;
       if (type === "other" && !OTHER_CATEGORIES.has(category)) return null;
       return { type, term: m[0] };
     }
@@ -173,7 +186,9 @@ var MeridianExtract = (function () {
     if (!Number.isFinite(t)) return null;
     const item = normalize(raw);
     if (RETRO.test(item.title) || namesOtherMonth(item.title, t)) return null;
-    const kind = classify(item.title, item.category);
+    // Headline only: summaries mention too much else (a surgery story is not a hospital strike).
+    let target = detectTarget(item.title);
+    const kind = classify(item.title, item.category, target);
     if (!kind) return null;
     // Telegram summaries often carry ads, so only news summaries help find the place, and only when they
     // name a city or region: a country in a summary is often a ship's flag or a side note.
@@ -184,9 +199,7 @@ var MeridianExtract = (function () {
     }
     if (!place) return null;
     // Leave out place names that start with "Port" (Port Sudan, Port Said) so they don't read as a port.
-    const title = /^Port\b/.test(place.term) ? item.title.replace(place.term, "") : item.title;
-    // Headline only: summaries mention too much else (a surgery story is not a hospital strike).
-    const target = detectTarget(title);
+    if (/^Port\b/.test(place.term)) target = detectTarget(item.title.replace(place.term, ""));
     return {
       target,
       id: item.id,

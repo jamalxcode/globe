@@ -1,6 +1,6 @@
 # Meridian
 
-A live world map of reported strikes and explosions. A hollow orange ring marks a report from one source; a solid pink dot marks two or more independent sources. Reports are news headlines and social posts, not confirmed facts.
+A live world map of reported strikes, explosions, industrial fires, wildfires and environmental incidents. A hollow orange ring marks a report from one source; a solid pink dot marks two or more independent sources. Reports are news headlines and social posts, not confirmed facts.
 
 It's a static page: no server, build step, API keys or sign-up. GitHub Pages serves the files and everything else happens in the visitor's browser.
 
@@ -21,7 +21,7 @@ The map uses the **Equal Earth** projection, which keeps every country at its tr
 ### Markers
 
 - **Sources:** one source is a hollow ring (and a dashed disc); two or more independent sources is a solid dot (and a solid disc). Shape carries the meaning, so it reads without color. The colors, orange and pink from the [Okabe-Ito palette](https://jfly.uni-koeln.de/color/), also stay distinct with red-green color blindness. The feed spells out the count ("1 source", "3 sources").
-- **What happened:** the icon inside the marker: airstrike (bomb), missile (rocket), explosion (burst), shelling (crosshair), drone, other (warning sign).
+- **What happened:** the icon inside the marker: airstrike (bomb), missile (rocket), explosion (burst), shelling (crosshair), drone, fire (flame), wildfire (tree), environmental (leaf), other (warning sign). Not every marker is an attack: explosions and fires may be accidents or covert action. **Fire** counts only at a facility (refinery, fuel depot, factory, power plant, port or ship, airport, railway, military site), so house fires stay out. **Wildfire** covers forest, bush, grass and peat fires. **Environmental** covers oil and chemical spills, gas, pipeline and radiation leaks, dam breaches, mine accidents and polluted rivers or seas.
 - **What was hit:** a small badge on the marker when the headline names it: airport, oil/fuel, power, railway, bridge, port/ship, military site, industry/warehouse, hospital, homes/civilian. Read from the headline only, and an event shows the target most of its headlines name. The rules are `TARGET_RULES` in [`extract.js`](extract.js).
 
 ## How a headline becomes a dot

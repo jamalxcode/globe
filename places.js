@@ -386,6 +386,11 @@ Jakarta|Indonesia|-6.21|106.85
 Washington, D.C.;Washington DC|USA|38.90|-77.04
 New York|USA|40.71|-74.01
 Caracas|Venezuela|10.49|-66.88
+Cardon;Cardón;Punto Fijo|Venezuela|11.63|-70.22
+Amuay|Venezuela|11.75|-70.22
+Paraguana;Paraguaná|Venezuela|11.70|-70.05|r
+El Palito|Venezuela|10.48|-68.12
+Puerto La Cruz|Venezuela|10.21|-64.63
 Bogota;Bogotá|Colombia|4.71|-74.07
 Mexico City|Mexico|19.43|-99.13
 Culiacan;Culiacán|Mexico|24.81|-107.39
@@ -395,6 +400,88 @@ London|UK|51.51|-0.13
 Paris|France|48.86|2.35
 Berlin|Germany|52.52|13.40
 Brussels|Belgium|50.85|4.35
+Alabama|USA|32.8|-86.8|r
+Alaska|USA|64.0|-152.0|r
+Arizona|USA|34.3|-111.7|r
+Arkansas|USA|34.9|-92.4|r
+California|USA|37.2|-119.5|r
+Colorado|USA|39.0|-105.5|r
+Connecticut|USA|41.6|-72.7|r
+Delaware|USA|39.0|-75.5|r
+Florida|USA|28.6|-82.4|r
+Hawaii|USA|20.8|-156.3|r
+Idaho|USA|44.4|-114.6|r
+Illinois|USA|40.0|-89.2|r
+Indiana|USA|39.9|-86.3|r
+Iowa|USA|42.1|-93.5|r
+Kansas|USA|38.5|-98.4|r
+Kentucky|USA|37.5|-85.3|r
+Louisiana|USA|31.1|-92.0|r
+Maine|USA|45.4|-69.2|r
+Maryland|USA|39.0|-76.8|r
+Massachusetts|USA|42.3|-71.8|r
+Michigan|USA|44.3|-85.4|r
+Minnesota|USA|46.3|-94.3|r
+Mississippi|USA|32.7|-89.7|r
+Missouri|USA|38.4|-92.5|r
+Montana|USA|47.0|-109.6|r
+Nebraska|USA|41.5|-99.8|r
+Nevada|USA|39.3|-116.6|r
+New Hampshire|USA|43.7|-71.6|r
+New Jersey|USA|40.2|-74.7|r
+New Mexico|USA|34.4|-106.1|r
+North Carolina|USA|35.6|-79.4|r
+North Dakota|USA|47.5|-100.5|r
+Ohio|USA|40.3|-82.8|r
+Oklahoma|USA|35.6|-97.5|r
+Oregon|USA|43.9|-120.6|r
+Pennsylvania|USA|40.9|-77.8|r
+Rhode Island|USA|41.7|-71.5|r
+South Carolina|USA|33.9|-80.9|r
+South Dakota|USA|44.4|-100.2|r
+Tennessee|USA|35.9|-86.4|r
+Texas|USA|31.5|-99.3|r
+Utah|USA|39.3|-111.7|r
+Vermont|USA|44.1|-72.7|r
+Virginia|USA|37.5|-78.8|r
+West Virginia|USA|38.6|-80.6|r
+Wisconsin|USA|44.6|-89.9|r
+Wyoming|USA|43.0|-107.5|r
+British Columbia|Canada|54.0|-125.0|r
+Alberta|Canada|55.0|-115.0|r
+Saskatchewan|Canada|54.0|-106.0|r
+Manitoba|Canada|55.0|-97.0|r
+Ontario|Canada|50.0|-86.0|r
+Quebec;Québec|Canada|52.0|-72.0|r
+Nova Scotia|Canada|45.0|-63.0|r
+New Brunswick|Canada|46.5|-66.2|r
+Newfoundland|Canada|49.0|-56.0|r
+Yukon|Canada|64.0|-135.0|r
+Northwest Territories|Canada|64.8|-119.0|r
+New South Wales|Australia|-32.5|147.0|r
+Queensland|Australia|-22.5|144.5|r
+Western Australia|Australia|-25.5|122.0|r
+South Australia|Australia|-30.0|135.8|r
+Tasmania|Australia|-42.0|146.6|r
+Northern Territory|Australia|-19.5|133.4|r
+Siberia|Russia|60.0|100.0|r
+Yakutia;Sakha|Russia|63.0|129.0|r
+Amazon;Amazon rainforest;Amazonia|Brazil|-5.0|-62.0|r
+Pantanal|Brazil|-17.0|-57.0|r
+Patagonia|Argentina|-45.0|-70.0|r
+Evia;Euboea|Greece|38.6|23.6|r
+Rhodes|Greece|36.2|28.0|r
+Attica|Greece|38.0|23.8|r
+Catalonia|Spain|41.8|1.5|r
+Andalusia|Spain|37.5|-4.5|r
+Canary Islands;Tenerife|Spain|28.3|-16.2|r
+Algarve|Portugal|37.2|-8.2|r
+Madeira|Portugal|32.75|-16.95|r
+Provence|France|43.9|6.0|r
+Sardinia|Italy|40.1|9.0|r
+Sicily|Italy|37.5|14.1|r
+Borneo;Kalimantan|Indonesia|0.5|114.0|r
+Sumatra|Indonesia|0.0|101.5|r
 `;
 
 // Map country names (Natural Earth, as used by world-atlas) to the names headlines use.
