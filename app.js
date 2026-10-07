@@ -27,6 +27,42 @@ const EVENT_TYPES = ["airstrike", "missile", "explosion", "shelling", "drone", "
 const TYPE_LABEL = { airstrike: "Airstrike", missile: "Missile", explosion: "Explosion", shelling: "Shelling", drone: "Drone", other: "Other" };
 const { RANK, RADIUS_KM } = MeridianExtract;
 
+// What was hit (see TARGET_RULES in extract.js): label and a 24x24 line icon, adapted from Lucide (ISC).
+const TARGETS = {
+  airport: { label: "Airport / airfield", d: "M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.3c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z" },
+  fuel: { label: "Oil / fuel", d: "M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z" },
+  power: { label: "Power / energy", d: "M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z" },
+  rail: { label: "Railway", d: "M8 3h8a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3zM5 10h14M9 13.5h.01M15 13.5h.01M8 17l-2 4M16 17l2 4" },
+  bridge: { label: "Bridge", d: "M3 17V9M21 17V9M3 9c4 5 14 5 18 0M3 14h18M8 14v-2.5M12 14v-1.5M16 14v-2.5" },
+  ship: { label: "Port / ship", d: "M2 21c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1 .6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1M19.38 20A11.6 11.6 0 0 0 21 14l-9-4-9 4c0 2.9.94 5.34 2.81 7.76M19 13V7a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v6M12 10v4M12 2v3" },
+  military: { label: "Military site", d: "M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" },
+  industry: { label: "Industry / warehouse", d: "M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7 5V8l-7 5V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2ZM17 18h1M12 18h1M7 18h1" },
+  hospital: { label: "Hospital / medical", d: "M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM12 7v10M7 12h10" },
+  civilian: { label: "Homes / civilian", d: "M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8M3 10a2 2 0 0 1 .71-1.53l7-6a2 2 0 0 1 2.58 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" },
+};
+
+// What happened: one icon per event type, also adapted from Lucide (bomb, rocket, crosshair, triangle-alert).
+const TYPE_ICONS = {
+  airstrike: "M20 13a9 9 0 1 1-18 0 9 9 0 1 1 18 0zM14.35 4.65 16.3 2.7a2.41 2.41 0 0 1 3.4 0l1.6 1.6a2.4 2.4 0 0 1 0 3.4l-1.95 1.95M22 2l-1.5 1.5",
+  missile: "M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09zM12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2zM9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5",
+  explosion: "M12 2l2.2 5.3L20 6l-2.6 5.1L22 14l-5.6 1.2L17 21l-5-3.2L7 21l.6-5.8L2 14l4.6-2.9L4 6l5.8 1.3z",
+  shelling: "M22 12a10 10 0 1 1-20 0 10 10 0 1 1 20 0zM22 12h-4M6 12H2M12 6V2M12 22v-4",
+  drone: "M9 9 6.5 6.5M15 9l2.5-2.5M9 15l-2.5 2.5M15 15l2.5 2.5M9 9h6v6H9zM8 5a3 3 0 1 1-6 0 3 3 0 1 1 6 0zM22 5a3 3 0 1 1-6 0 3 3 0 1 1 6 0zM8 19a3 3 0 1 1-6 0 3 3 0 1 1 6 0zM22 19a3 3 0 1 1-6 0 3 3 0 1 1 6 0z",
+  other: "M21.73 18l-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3zM12 9v4M12 17h.01",
+};
+
+function svgIcon(d, cls = "ticon") {
+  return d ? `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>` : "";
+}
+
+function targetIcon(target, cls) {
+  return TARGETS[target] ? svgIcon(TARGETS[target].d, cls) : "";
+}
+
+function typeIcon(type, cls) {
+  return svgIcon(TYPE_ICONS[type], cls);
+}
+
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 const state = {
@@ -132,7 +168,7 @@ function buildEvents(mentions) {
       const d = haversineKm(ev.lat, ev.lng, m.place.lat, m.place.lng);
       if (d <= MERGE_KM && d < bestDist) { best = ev; bestDist = d; }
     }
-    const report = { source: m.source, title: m.title, url: m.url, published: m.published, social: m.social, id: m.id };
+    const report = { source: m.source, title: m.title, url: m.url, published: m.published, social: m.social, id: m.id, target: m.target };
     if (best) {
       if (!best.urls.has(report.url)) { best.urls.add(report.url); best.reports.push(report); }
       best.sources.add(report.source);
@@ -167,6 +203,11 @@ function buildEvents(mentions) {
     ev.source_count = ev.sources.size;
     ev.status = ev.source_count >= 2 ? "corroborated" : "unverified";
     ev.reports.sort((a, b) => Date.parse(b.published) - Date.parse(a.published));
+    // The target most of its headlines name; on a tie, the one the newest headline names.
+    const votes = new Map();
+    for (const r of ev.reports) if (r.target) votes.set(r.target, (votes.get(r.target) || 0) + 1);
+    ev.target = null;
+    for (const [target, n] of votes) if (!ev.target || n > votes.get(ev.target)) ev.target = target;
   }
   events.sort((a, b) => b.lastT - a.lastT);
   return events.slice(0, MAX_EVENTS);
@@ -289,6 +330,12 @@ function fadeFor(ev, now) {
 
 const mapEl = document.getElementById("map");
 const svg = d3.select(mapEl).append("svg");
+// Type icons (y-...) and target icons (t-...) as reusable symbols, drawn inside event markers.
+svg.append("defs").selectAll("symbol")
+  .data([...Object.entries(TYPE_ICONS).map(([k, d]) => [`y-${k}`, d]), ...Object.entries(TARGETS).map(([k, t]) => [`t-${k}`, t.d])])
+  .join("symbol")
+  .attr("id", ([id]) => id).attr("viewBox", "0 0 24 24")
+  .append("path").attr("d", ([, d]) => d);
 const root = svg.append("g");
 const sphereEl = root.append("path").attr("class", "sphere");
 const graticuleEl = root.append("path").attr("class", "graticule");
@@ -335,7 +382,8 @@ function layout() {
 function drawEvents() {
   const now = Date.now();
   const list = filtered().slice().reverse(); // oldest first, so the newest draw on top
-  const tone = (d) => (d.status === "corroborated" ? "alert" : "amber");
+  // "one" = a single source (hollow, dashed), "multi" = two or more (solid): told apart by shape, not only color.
+  const tone = (d) => (d.status === "corroborated" ? "multi" : "one");
   const hot = (d) => (state.hover === d.id || (state.selection && state.selection.id === d.id) ? " hot" : "");
 
   discsG.selectAll("path").data(list.filter((d) => d.precision !== "city"), (d) => d.id).join("path")
@@ -344,16 +392,25 @@ function drawEvents() {
     .attr("d", (d) => geoPath(d3.geoCircle().center([d.lng, d.lat]).radius(d.radius_km / 111.2)()))
     .style("opacity", (d) => fadeFor(d, now));
 
-  dotsG.selectAll("g.dot").data(list.filter((d) => d.precision === "city"), (d) => d.id).join((enter) => {
+  // Every event gets a marker (at a disc's center for regions and countries): the event-type icon inside,
+  // and a small badge with what was hit when the headlines say.
+  dotsG.selectAll("g.dot").data(list, (d) => d.id).join((enter) => {
     const g = enter.append("g").attr("data-kind", "event").attr("data-id", (d) => d.id);
     g.append("circle").attr("class", "halo");
     g.append("circle").attr("class", "core");
+    g.append("use").attr("class", "glyph");
+    g.append("circle").attr("class", "tbadge");
+    g.append("use").attr("class", "tglyph");
     g.append("circle").attr("class", "hit");
+    g.append("title");
     return g;
   })
     .attr("class", (d) => `dot ${tone(d)}${hot(d)}`)
     .attr("transform", (d) => `translate(${projection([d.lng, d.lat])})`)
     .style("opacity", (d) => fadeFor(d, now))
+    .call((g) => g.select(".glyph").attr("href", (d) => `#y-${d.event_type}`))
+    .call((g) => g.select(".tglyph").attr("href", (d) => (d.target ? `#t-${d.target}` : null)))
+    .call((g) => g.select("title").text((d) => `${d.location_name}: ${TYPE_LABEL[d.event_type]}${d.target ? ` · ${TARGETS[d.target].label}` : ""} · ${d.source_count} ${d.source_count === 1 ? "source" : "sources"}`))
     .order();
   rescale();
 }
@@ -362,18 +419,28 @@ function drawEvents() {
 function rescale() {
   const s = 1 / k;
   dotsG.selectAll("g.dot").each(function (d) {
-    const big = state.hover === d.id || (state.selection && state.selection.id === d.id) ? 1.5 : 1;
+    const big = state.hover === d.id || (state.selection && state.selection.id === d.id) ? 1.4 : 1;
+    const r = 10.5 * s * big;
+    const icon = 13 * s * big;
     const g = d3.select(this);
-    g.select(".halo").attr("r", 9 * s * big);
-    g.select(".core").attr("r", 3.5 * s * big);
-    g.select(".hit").attr("r", 11 * s);
+    g.select(".halo").attr("r", r + 5 * s);
+    g.select(".core").attr("r", r);
+    g.select(".glyph").attr("x", -icon / 2).attr("y", -icon / 2).attr("width", icon).attr("height", icon);
+    // Target badge sits on the marker's top-right edge.
+    const bx = r * 0.85;
+    const by = -r * 0.85;
+    const br = 7.5 * s * big;
+    const bi = 10 * s * big;
+    g.select(".tbadge").attr("cx", bx).attr("cy", by).attr("r", br).style("display", d.target ? null : "none");
+    g.select(".tglyph").attr("x", bx - bi / 2).attr("y", by - bi / 2).attr("width", bi).attr("height", bi).style("display", d.target ? null : "none");
+    g.select(".hit").attr("r", Math.max(r + 3 * s, 11 * s));
   });
 }
 
 function burst(ev) {
   if (reduceMotion) return;
   const [x, y] = projection([ev.lng, ev.lat]);
-  const color = ev.status === "corroborated" ? "var(--alert)" : "var(--amber)";
+  const color = ev.status === "corroborated" ? "var(--multi)" : "var(--one)";
   const s = 1 / k;
   burstsG.append("circle").attr("class", "flash").attr("cx", x).attr("cy", y).attr("r", 4 * s)
     .style("fill", color).style("opacity", 0.9)
@@ -422,6 +489,12 @@ function focusOn(lat, lng, selection) {
 }
 let focusToken = null;
 
+// Back to the whole world.
+function resetView() {
+  focusToken = null;
+  svg.transition().duration(reduceMotion ? 0 : 750).ease(d3.easeCubicInOut).call(zoom.transform, d3.zoomIdentity);
+}
+
 function pick(kind, id) {
   if (kind === "place") {
     const place = FEATURED_PLACES.find((p) => p.id === id);
@@ -466,7 +539,7 @@ function renderPlaces() {
 }
 
 function renderFilters() {
-  const types = EVENT_TYPES.map((t) => `<button type="button" class="chip" data-type="${t}" aria-pressed="${state.enabled[t]}">${TYPE_LABEL[t]}</button>`).join("");
+  const types = EVENT_TYPES.map((t) => `<button type="button" class="chip" data-type="${t}" aria-pressed="${state.enabled[t]}">${typeIcon(t)}${TYPE_LABEL[t]}</button>`).join("");
   const corr = `<button type="button" class="chip corr" data-corr aria-pressed="${state.corroboratedOnly}">Corroborated only</button>`;
   const wins = WINDOWS.map((w) => `<button type="button" class="chip win" data-window="${w.h}" aria-pressed="${state.windowH === w.h}" title="Last ${w.long}">${w.label}</button>`).join("");
   const html = types + corr + '<span class="sep"></span>' + wins;
@@ -483,11 +556,14 @@ function renderFeed() {
     html = `<li class="empty">No reports match these filters in the last ${windowInfo(state.windowH).long}.</li>`;
   } else {
     html = list.map((ev) => {
-      const tone = ev.status === "corroborated" ? "alert" : "amber";
+      const tone = ev.status === "corroborated" ? "multi" : "one";
       const active = state.hover === ev.id || (state.selection && state.selection.id === ev.id);
+      // The tag spells out the source count (hollow for one, solid for several), so color isn't needed.
+      const tag = `<span class="tag ${tone}">${ev.source_count} ${ev.source_count === 1 ? "source" : "sources"}</span>`;
+      const target = ev.target ? `<span class="target" title="${esc(TARGETS[ev.target].label)}">${targetIcon(ev.target)}${esc(TARGETS[ev.target].label)}</span>` : "";
       return `<li><button type="button" class="row ${tone}${active ? " active" : ""}" data-row-kind="event" data-row-id="${ev.id}">
-        <span class="line"><span class="type">${TYPE_LABEL[ev.event_type]}</span><span class="time">${relativeTime(ev.last_updated, now)}</span></span>
-        <span class="line"><span class="where">${esc(ev.location_name)}<span> · ${esc(ev.country)}</span></span>${ev.source_count < 2 ? '<span class="tag">Unverified</span>' : ""}</span>
+        <span class="line"><span class="type">${typeIcon(ev.event_type)}${TYPE_LABEL[ev.event_type]}${target}</span><span class="time">${relativeTime(ev.last_updated, now)}</span></span>
+        <span class="line"><span class="where">${esc(ev.location_name)}<span> · ${esc(ev.country)}</span></span>${tag}</span>
         <span class="headline">${esc(ev.reports[0].title)}</span>
       </button></li>`;
     }).join("");
@@ -548,14 +624,36 @@ function renderCard() {
     const now = Date.now();
     const reports = ev.reports.slice(0, 8).map((r) => `<li><a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${ICON_EXT}
       <span><span class="src">${esc(r.source)}${r.social ? " · social" : ""} · ${relativeTime(r.published, now)}</span><span class="ttl">${esc(r.title)}</span></span></a></li>`).join("");
-    card.innerHTML = `<div class="top"><div><p class="kicker ${corroborated ? "alert" : "amber"}">${TYPE_LABEL[ev.event_type]} · ${corroborated ? "Corroborated" : "Unverified"}</p><h2>${esc(ev.location_name)}</h2></div>${close}</div>
-      <div class="body"><p class="muted">${esc(ev.country)}</p>
+    const target = ev.target ? `<p class="hit-target">${targetIcon(ev.target)}<span>Hit: ${esc(TARGETS[ev.target].label)} <span class="muted">(from the headlines)</span></span></p>` : "";
+    card.innerHTML = `<div class="top"><div><p class="kicker ${corroborated ? "multi" : "one"}">${typeIcon(ev.event_type)}${TYPE_LABEL[ev.event_type]} ·${corroborated ? "Corroborated" : "Unverified"}</p><h2>${esc(ev.location_name)}</h2></div>${close}</div>
+      <div class="body"><p class="muted">${esc(ev.country)}</p>${target}
       <p class="meta">${formatUtc(ev.last_updated)} · ${formatLocal(ev.last_updated)}</p>
       <p class="meta muted">${ev.source_count} ${ev.source_count === 1 ? "source" : "independent sources"}${ev.precision !== "city" ? ` · ${ev.precision} ±${ev.radius_km} km` : ""}</p>
       <ul class="reports">${reports}</ul>
       <a class="search" href="${esc(xSearchUrl(ev.location_name, ev.event_type))}" target="_blank" rel="noopener noreferrer">Latest posts on X →</a></div>`;
   }
   card.hidden = false;
+}
+
+// The Key popover: what the marker shapes, colors and icons mean.
+function renderKey() {
+  const item = (icon, label) => `<li>${icon}<span>${esc(label)}</span></li>`;
+  document.getElementById("key").innerHTML = `
+    <h2>Sources</h2>
+    <ul>
+      ${item('<i class="swatch one"></i>', "Hollow ring: 1 source")}
+      ${item('<i class="swatch multi"></i>', "Solid dot: 2+ independent sources")}
+    </ul>
+    <h2>What happened</h2>
+    <ul>${EVENT_TYPES.map((t) => item(typeIcon(t), TYPE_LABEL[t])).join("")}</ul>
+    <h2>What was hit <span>(small badge, when the headline says)</span></h2>
+    <ul>${Object.keys(TARGETS).map((t) => item(targetIcon(t), TARGETS[t].label)).join("")}</ul>
+    <p>Cities are markers; regions and countries also get a 100 or 300 km disc. Markers fade as reports age.</p>`;
+}
+
+function setKeyOpen(open) {
+  document.getElementById("key").hidden = !open;
+  document.querySelector("[data-key-toggle]").setAttribute("aria-expanded", String(open));
 }
 
 function renderSheet() {
@@ -587,6 +685,9 @@ document.addEventListener("click", (e) => {
     return;
   }
   if (e.target.closest("[data-close]")) { state.cardOn = false; renderCard(); return; }
+  if (e.target.closest("[data-reset]")) { resetView(); return; }
+  if (e.target.closest("[data-key-toggle]")) { setKeyOpen(document.getElementById("key").hidden); return; }
+  if (!e.target.closest("#key")) setKeyOpen(false);
   const toggle = e.target.closest("[data-toggle]");
   if (toggle) {
     const panel = document.getElementById(toggle.dataset.toggle);
@@ -623,12 +724,14 @@ document.addEventListener("focusin", (e) => {
   if (row) setHover(row.dataset.rowId);
 });
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && state.cardOn) { state.cardOn = false; renderCard(); }
+  if (e.key === "Escape") { setKeyOpen(false); if (state.cardOn) { state.cardOn = false; renderCard(); } }
+  if ((e.key === "0" || e.key === "Home") && !e.target.closest("input, textarea")) resetView();
 });
 
 // ---------- start ----------
 
 async function start() {
+  renderKey();
   render();
   layout();
   new ResizeObserver(() => layout()).observe(mapEl);

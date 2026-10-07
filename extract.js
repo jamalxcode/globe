@@ -27,6 +27,21 @@ var MeridianExtract = (function () {
   // A place right after one of these words is more likely where it happened than who did it.
   const PLACE_CUES = new Set(["in", "on", "near", "at", "over", "into", "across", "outside", "inside", "of", "targeting", "targeted", "targets", "hit", "hits", "struck", "strikes", "strike", "attack", "attacks", "attacked", "pounds", "pounded", "bombed", "bombs", "shelled", "shells", "toward", "towards"]);
 
+  // What was hit, when the headline says. First match wins, so the more specific targets come first
+  // ("airport fuel depot" is an airport, "power plant" is power, not industry).
+  const TARGET_RULES = [
+    ["hospital", /\b(hospitals?|clinics?|medical (centre|center|facility|facilities)|ambulances?)\b/i],
+    ["airport", /\b(airports?|airfields?|air ?bases?|aerodromes?|runways?|hangars?)\b/i],
+    ["fuel", /\b(refiner(y|ies)|oil (depots?|terminals?|facilit\w+|storage|tanks?|fields?|plants?|platforms?)|fuel (depots?|storage|tanks?|facilit\w+|stations?)|petrol(eum)? (depots?|facilit\w+)|gas (plants?|facilit\w+|fields?|stations?)|LNG|pipelines?|tank farm)\b/i],
+    ["power", /\b(power (plants?|stations?|grid|lines?|facilit\w+|infrastructure|substations?)|substations?|thermal (power )?plants?|energy (infrastructure|facilit\w+|sites?)|hydroelectric|dams?|nuclear (power )?plants?|electricity)\b/i],
+    ["rail", /\b(railways?|railroads?|rail (lines?|stations?|infrastructure|depots?|hub)|train stations?|trains?|locomotives?)\b/i],
+    ["bridge", /\b(bridges?)\b/i],
+    ["ship", /\b(ports?|harbou?rs?|docks?|shipyards?|ships?|vessels?|tankers?|freighters?|warships?|frigates?|boats?)\b/i],
+    ["military", /\b(military (bases?|facilit\w+|sites?|targets?|positions?|headquarters|HQ|airfields?)|bases?|barracks|command (posts?|centers?|centres?)|headquarters|air defen[cs]e|radars?|ammunition (depots?|warehouses?|dumps?|stores?)|arms (depots?|warehouses?)|weapons (depots?|warehouses?|stores?)|arsenals?|troops)\b/i],
+    ["industry", /\b(factor(y|ies)|plants?|industrial|enterprises?|warehouses?|depots?|production (facilit\w+|sites?)|workshops?)\b/i],
+    ["civilian", /\b(residential|apartments?|high-rises?|blocks? of flats|homes?|houses?|buildings?|neighbou?rhoods?|villages?|markets?|schools?|universit(y|ies)|kindergartens?|shelters?|civilians?)\b/i],
+  ];
+
   const RANK = { city: 3, region: 2, country: 1 };
   const RADIUS_KM = { city: 10, region: 100, country: 300 };
 
@@ -107,7 +122,13 @@ var MeridianExtract = (function () {
     return null;
   }
 
-  // About 100 m: plenty for a map pin, and keeps the archive small.
+  function detectTarget(text) {
+    if (!text) return null;
+    for (const [target, re] of TARGET_RULES) if (re.test(text)) return target;
+    return null;
+  }
+
+  // About 100 m: plenty for a map pin.
   function round3(x) {
     return Math.round(x * 1000) / 1000;
   }
@@ -139,7 +160,12 @@ var MeridianExtract = (function () {
       if (fromSummary && fromSummary.precision !== "country") place = fromSummary;
     }
     if (!place) return null;
+    // Leave out place names that start with "Port" (Port Sudan, Port Said) so they don't read as a port.
+    const title = /^Port\b/.test(place.term) ? item.title.replace(place.term, "") : item.title;
+    // Headline only: summaries mention too much else (a surgery story is not a hospital strike).
+    const target = detectTarget(title);
     return {
+      target,
       id: item.id,
       published: new Date(t).toISOString(),
       title: item.title,
@@ -151,5 +177,5 @@ var MeridianExtract = (function () {
     };
   }
 
-  return { RANK, RADIUS_KM, buildMatcher, locate, classify, toMention };
+  return { RANK, RADIUS_KM, buildMatcher, locate, classify, detectTarget, toMention };
 })();

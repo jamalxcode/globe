@@ -18,7 +18,18 @@
 <body>
   <div id="map" aria-label="World map of reported strikes and explosions"></div>
 
-  <div class="status-wrap"><div id="status" class="status" title="Loading the news feed."><span class="dot"></span><span class="label">Loading</span></div></div>
+  <div class="status-wrap">
+    <div id="status" class="status" title="Loading the news feed."><span class="dot"></span><span class="label">Loading</span></div>
+    <button type="button" class="status reset" data-reset title="Show the whole world (key: 0)">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+      <span>Full view</span>
+    </button>
+    <button type="button" class="status reset" data-key-toggle aria-expanded="false" aria-controls="key" title="What the symbols mean">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+      <span>Key</span>
+    </button>
+  </div>
+  <div id="key" class="key-pop" hidden></div>
 
   <!-- With a mouse, the side panels hide; moving near an edge brings them back. -->
   <div class="edge edge-left" data-edge="places-panel" aria-hidden="true"><span class="edge-tab">Places</span></div>
@@ -48,7 +59,7 @@
   </aside>
 
   <section class="sheet">
-    <p class="note">Unverified news and social media reports. Not for operational use.</p>
+    <p class="note"><span class="key"><i class="one"></i>1 source</span> <span class="key"><i class="multi"></i>2+ sources</span> · Unverified reports. Not for operational use.</p>
     <div class="tabs">
       <button type="button" data-tab="places">Places</button>
       <button type="button" data-tab="feed" class="active">Feed</button>
@@ -59,11 +70,14 @@
     </div>
   </section>
 
-  <p class="footer-note">
-    <span class="key"><i class="amber"></i>1 source</span>
-    <span class="key"><i class="alert"></i>2+ independent sources</span>
-    <span>Unverified news and social media reports. Not for operational use.</span>
-  </p>
+  <div class="footer-note">
+    <p class="legend">
+      <span class="key"><i class="one"></i>1 source</span>
+      <span class="key"><i class="multi"></i>2+ independent sources</span>
+      <span>Icons: see Key at the top</span>
+    </p>
+    <p>Unverified news and social media reports. Not for operational use.</p>
+  </div>
 
   <article id="card" class="card" hidden></article>
 
