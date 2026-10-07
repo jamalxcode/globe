@@ -16,8 +16,12 @@ if (!KEY) {
 
 // Two satellites with the same sensor, each passing about twice a day.
 const PRODUCTS = ["VIIRS_SNPP_NRT", "VIIRS_NOAA20_NRT"];
-const DAYS = 2;
-const NEAR_KM = 15; // keep detections this close to a known city (the page matches within 10 km)
+const HISTORY_DAYS = 5; // downloaded, to spot permanent heat sources
+const KEEP_HOURS = 48;  // published (the map's longest range)
+const NEAR_KM = 15;     // keep detections this close to a known city (the page matches within 10 km)
+// A spot (about 1 km, a 0.01-degree cell) hot on this many different days is a permanent source (gas flare,
+// steel plant, refinery stack), not an event: it is left out.
+const PERSISTENT_DAYS = 3;
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const context = vm.createContext({});
@@ -54,10 +58,10 @@ function nearCity(lat, lng) {
   return false;
 }
 
-const points = [];
+const all = []; // [lat, lng, minutes, frp, day]
 let read = 0;
 for (const product of PRODUCTS) {
-  const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${KEY}/${product}/world/${DAYS}`;
+  const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${KEY}/${product}/world/${HISTORY_DAYS}`;
   const res = await fetch(url);
   if (!res.ok) {
     console.error(`${product}: HTTP ${res.status}`);
@@ -81,15 +85,33 @@ for (const product of PRODUCTS) {
     if (!nearCity(lat, lng)) continue;
     const hhmm = f[iTime].padStart(4, "0");
     const t = Date.parse(`${f[iDate]}T${hhmm.slice(0, 2)}:${hhmm.slice(2)}:00Z`);
-    points.push([Math.round(lat * 1000) / 1000, Math.round(lng * 1000) / 1000, Math.round(t / 60000), Math.round(Number(f[iFrp]) || 0)]);
+    all.push([Math.round(lat * 1000) / 1000, Math.round(lng * 1000) / 1000, Math.round(t / 60000), Math.round(Number(f[iFrp]) || 0), f[iDate]]);
   }
 }
 
-console.error(`read ${read} detections, kept ${points.length} near cities`);
+// Days each ~1 km cell was hot; cells hot on PERSISTENT_DAYS or more days are permanent sources.
+const cell = (lat, lng) => `${Math.round(lat * 100)},${Math.round(lng * 100)}`;
+const days = new Map();
+for (const [lat, lng, , , day] of all) {
+  const key = cell(lat, lng);
+  if (!days.has(key)) days.set(key, new Set());
+  days.get(key).add(day);
+}
+const cutoff = Date.now() / 60000 - KEEP_HOURS * 60;
+let persistent = 0;
+const points = [];
+for (const [lat, lng, minutes, frp] of all) {
+  if (minutes < cutoff) continue;
+  if (days.get(cell(lat, lng)).size >= PERSISTENT_DAYS) { persistent++; continue; }
+  points.push([lat, lng, minutes, frp]);
+}
+
+console.error(`read ${read} detections; ${all.length} near cities in ${HISTORY_DAYS} days; last ${KEEP_HOURS} h: kept ${points.length}, left out ${persistent} at permanent heat sources`);
 process.stdout.write(JSON.stringify({
   generated_at: new Date().toISOString(),
   source: "NASA FIRMS, VIIRS S-NPP and NOAA-20, near-real-time",
-  hours: DAYS * 24,
+  hours: KEEP_HOURS,
+  persistent_left_out: persistent,
   // [lat, lng, minutes since 1970 UTC, fire radiative power in MW]
   points,
 }));

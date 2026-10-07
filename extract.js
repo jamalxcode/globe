@@ -73,6 +73,219 @@ var MeridianExtract = (function () {
     ["civilian", /\b(residential|apartments?|high-rises?|blocks? of flats|homes?|houses?|buildings?|neighbou?rhoods?|villages?|markets?|schools?|universit(y|ies)|kindergartens?|shelters?|civilians?)\b/i],
   ];
 
+  // ---------- Arabic, Russian, Ukrainian ----------
+  // Same kinds of rule as above. Cyrillic words are matched by stem (case endings vary); Arabic words may carry
+  // attached prefixes, so they're matched anywhere in a word. Text is normalized first (normalizeI18n).
+
+  const CYRILLIC = /[Ѐ-ӿ]/;
+  const ARABIC = /[؀-ۿ]/;
+
+  // Arabic letter variants (أ إ آ -> ا, ى -> ي, ة -> ه), no diacritics or tatweel; Cyrillic ё -> е.
+  function normalizeI18n(s) {
+    return s
+      .replace(/[ً-ْـ]/g, "")
+      .replace(/[أإآ]/g, "ا").replace(/ى/g, "ي").replace(/ة/g, "ه")
+      .replace(/ё/g, "е").replace(/Ё/g, "Е");
+  }
+
+  function langOf(text) {
+    if (ARABIC.test(text)) return "ar";
+    if (CYRILLIC.test(text)) return /[іїєґІЇЄҐ]/.test(text) ? "uk" : "ru";
+    return "en";
+  }
+
+  // Stems, matched case-insensitively at the start of a word.
+  const stems = (list) => new RegExp(`(?<![\\p{L}])(${list})`, "iu");
+  const anywhere = (list) => new RegExp(`(${list})`, "u");
+
+  const I18N = {
+    ru: {
+      types: [
+        ["drone", stems("беспилотн|бпла|дрон|шахед|герань")],
+        ["missile", stems("ракет|искандер|кинжал|калибр|баллистич|пво сбил")],
+        ["airstrike", stems("авиаудар|авиабомб|бомбардир|бомбов")],
+        ["shelling", stems("обстрел|артиллер|артобстрел|миномет|рсзо")],
+        ["explosion", stems("взрыв|детонац")],
+        ["wildfire", stems("лесн[а-я]* пожар|природн[а-я]* пожар|пожар[а-я]* в лес")],
+        ["environment", stems("разлив нефт|утечк[а-я]* (газа|аммиака|хлора)|прорыв дамб|обрушени[а-я]* шахт")],
+        ["fire", stems("пожар|возгоран|горит|загорел")],
+        ["other", stems("удар|атак")],
+      ],
+      action: stems("удар|атак|сбит|сбил|попал|поражен|уничтож|погиб|ранен|пострада|пожар|взрыв|обстрел|обломк|прилет|возгоран|загорел|горит|авиаудар|бомбардир"),
+      negative: stems("учени|испытан|парад|контракт|закуп|поставк|выставк|годовщин|год назад|лет назад|может|возможн|угроз"),
+      targets: [
+        ["hospital", stems("больниц|госпитал|поликлиник")],
+        ["airport", stems("аэропорт|аэродром|авиабаз")],
+        ["fuel", stems("нпз|нефтебаз|нефтеперераб|нефтехранилищ|топлив|нефтяно|газопровод|нефтепровод")],
+        ["power", stems("подстанц|электростанц|тэц|тэс|гэс|аэс|энергетич|энергообъект|электроснабж")],
+        ["rail", stems("железнодорож|жд |вокзал|поезд|локомотив")],
+        ["bridge", stems("мост")],
+        ["ship", stems("порт|судн|танкер|корабл|катер")],
+        ["military", stems("военн[а-я]* (часть|объект|аэродром|баз)|казарм|склад[а-я]* боеприпас|арсенал|штаб")],
+        ["industry", stems("завод|предприят|склад|комбинат|фабрик")],
+        ["civilian", stems("жил[а-я]* дом|многоэтаж|многоквартир|частн[а-я]* дом|дом[а-я]* |школ|детск[а-я]* сад|рынок|торгов[а-я]* центр")],
+      ],
+      cues: new Set(["в", "во", "на", "по", "над", "под", "у", "около", "близ", "возле", "районе"]),
+      speaker: /^\s*(заявил|сообщил|заявила|сообщило|сообщили|заявляет|утверждает|обвинил|обвиняет)/i,
+      when: [
+        ["overnight", stems("ночью|этой ночью|в ночь на|ночная атак")],
+        ["yesterday", stems("вчера")],
+        ["earlier today", stems("утром|сегодня утром")],
+      ],
+    },
+    uk: {
+      types: [
+        ["drone", stems("безпілотн|бпла|дрон|шахед|ударн[а-яіїєґ]* бпла")],
+        ["missile", stems("ракет|балістичн|іскандер|кинджал|калібр")],
+        ["airstrike", stems("авіаудар|авіабомб|кабами|каб ")],
+        ["shelling", stems("обстріл|артилер|міномет|рсзв")],
+        ["explosion", stems("вибух|детонац")],
+        ["wildfire", stems("лісов[а-яіїєґ]* пожеж|природн[а-яіїєґ]* пожеж")],
+        ["environment", stems("розлив нафт|витік газу|витік аміаку|прорив дамб|обвал[а-яіїєґ]* шахт")],
+        ["fire", stems("пожеж|загоран|горить|займан")],
+        ["other", stems("удар|атак")],
+      ],
+      action: stems("удар|атак|збит|збил|влуч|уражен|знищ|загин|поранен|постражд|пожеж|вибух|обстріл|уламк|приліт|займан|горить|авіаудар"),
+      negative: stems("навчан|випробуван|парад|контракт|закупів|постач|виставк|річниц|рік тому|років тому|може|можлив|загроз"),
+      targets: [
+        ["hospital", stems("лікарн|госпітал|поліклінік")],
+        ["airport", stems("аеропорт|аеродром|авіабаз")],
+        ["fuel", stems("нпз|нафтобаз|нафтопереробн|нафтосховищ|палив|газопровід|нафтопровід")],
+        ["power", stems("підстанц|електростанц|тец|тес|гес|аес|енергетич|енергооб'єкт|енергооб’єкт|енергопостач")],
+        ["rail", stems("залізнич|вокзал|потяг|локомотив")],
+        ["bridge", stems("міст|мосту")],
+        ["ship", stems("порт|судн|танкер|корабл")],
+        ["military", stems("військов[а-яіїєґ]* (частин|об|аеродром|баз)|казарм|склад[а-яіїєґ]* боєприпас|арсенал|штаб")],
+        ["industry", stems("завод|підприєм|склад|комбінат|фабрик")],
+        ["civilian", stems("житлов|багатоповерх|багатоквартир|приватн[а-яіїєґ]* будин|будин|школ|дитяч[а-яіїєґ]* садок|ринок|торгов[а-яіїєґ]* центр")],
+      ],
+      cues: new Set(["в", "у", "на", "по", "над", "під", "біля", "поблизу", "районі"]),
+      speaker: /^\s*(заявив|повідомив|заявила|повідомила|повідомили|стверджує|звинуватив)/i,
+      when: [
+        ["overnight", stems("вночі|цієї ночі|у ніч на|в ніч на|нічна атак")],
+        ["yesterday", stems("вчора|учора")],
+        ["earlier today", stems("вранці|зранку|сьогодні вранці")],
+      ],
+    },
+    ar: {
+      types: [
+        ["drone", anywhere("مسير|مسيره|طائره مسيره|طائرات مسيره|درون")],
+        ["missile", anywhere("صاروخ|صواريخ|باليستي")],
+        ["airstrike", anywhere("غاره|غارات|قصف جوي|الطيران الحربي|طيران حربي")],
+        ["shelling", anywhere("قصف مدفعي|قذائف|مدفعيه|قصف")],
+        ["explosion", anywhere("انفجار|تفجير|عبوه ناسفه|سياره مفخخه")],
+        ["wildfire", anywhere("حرائق الغابات|حريق غابات|حرائق غابات|حريق في غابه")],
+        ["environment", anywhere("تسرب نفطي|تسرب الغاز|تسرب غاز|انهيار سد|انهيار منجم|تلوث")],
+        ["fire", anywhere("حريق|حرائق|اشتعال|النيران")],
+        ["other", anywhere("هجوم|استهداف|ضربه|ضربات")],
+      ],
+      action: anywhere("هجوم|استهداف|سقوط|اسقاط|اعتراض|مقتل|اصابه|قتلي|جرحي|انفجار|حريق|قصف|ضرب|تدمير|استهدف|شن|غاره|غارات"),
+      negative: anywhere("مناورات|تجربه|استعراض|صفقه|ذكري|قبل عام|قبل سنوات|محتمل|قد "),
+      targets: [
+        ["hospital", anywhere("مستشفي|مشفي|مستوصف")],
+        ["airport", anywhere("مطار|قاعده جويه")],
+        ["fuel", anywhere("مصفاه|مستودع وقود|خزانات وقود|منشاه نفطيه|حقل نفط|خط انابيب")],
+        ["power", anywhere("محطه كهرباء|محطه طاقه|محطه توليد|الكهرباء")],
+        ["rail", anywhere("سكه حديد|قطار|محطه قطار")],
+        ["bridge", anywhere("جسر")],
+        ["ship", anywhere("ميناء|سفينه|ناقله|مرفا|زورق")],
+        ["military", anywhere("قاعده عسكريه|موقع عسكري|ثكنه|مقر عسكري|مخزن اسلحه|مستودع ذخيره")],
+        ["industry", anywhere("مصنع|مستودع|منشاه صناعيه")],
+        ["civilian", anywhere("منزل|منازل|مبني سكني|سكني|مدرسه|سوق|خيام|مخيم")],
+      ],
+      cues: new Set(["في", "علي", "قرب", "شمال", "جنوب", "شرق", "غرب", "وسط", "مدينه", "بلده", "محيط"]),
+      speaker: /^\s*(يقول|تقول|اعلن|اعلنت|تعلن|يعلن|تتهم|يتهم)/,
+      when: [
+        ["overnight", anywhere("الليله الماضيه|ليلا|خلال الليل|فجر اليوم|فجرا")],
+        ["yesterday", anywhere("امس")],
+        ["earlier today", anywhere("صباح اليوم")],
+      ],
+    },
+  };
+
+  // English time words for estimating when it happened (see whenOf).
+  const EN_WHEN = [
+    ["overnight", /\b(overnight|last night|night attack|during the night)\b/i],
+    ["yesterday", /\byesterday\b/i],
+    ["earlier today", /\b(this morning|earlier today|early today|early on \w+day)\b/i],
+  ];
+  const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+
+  // { label, from, to } (ISO): when the headline implies it happened, or null for "around when reported".
+  function whenOf(title, published, lang) {
+    const t = Date.parse(published);
+    const day = 24 * 3600e3;
+    const startOfDay = (ms) => ms - (ms % day);
+    const span = (label, from, to) => ({ label, from: new Date(from).toISOString(), to: new Date(Math.min(to, t)).toISOString() });
+    const rules = lang === "en" ? EN_WHEN : I18N[lang].when;
+    for (const [label, re] of rules) {
+      if (!re.test(title)) continue;
+      // A night is about 10 hours; the reader's or the place's time zone isn't known, so it's the 10 before the report.
+      if (label === "overnight") return span(label, t - 10 * 3600e3, t);
+      if (label === "yesterday") return span(label, startOfDay(t) - day, startOfDay(t));
+      if (label === "earlier today") return span(label, startOfDay(t), t);
+    }
+    if (lang === "en") {
+      const ago = title.match(/\b(\d{1,2}) hours? ago\b/i);
+      if (ago) { const at = t - Number(ago[1]) * 3600e3; return span(`${ago[1]} hours before the report`, at - 3600e3, at + 3600e3); }
+      const wd = title.match(/\bon (Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday)\b/i);
+      if (wd) {
+        const target = WEEKDAYS.indexOf(wd[1].toLowerCase());
+        const back = (new Date(t).getUTCDay() - target + 7) % 7;
+        if (back > 0) return span(`on ${wd[1][0].toUpperCase()}${wd[1].slice(1).toLowerCase()}`, startOfDay(t) - back * day, startOfDay(t) - (back - 1) * day);
+      }
+    }
+    return null;
+  }
+
+  // Explainers and features ("How children in Yemen go to school...", "What we know about..."), by their opening.
+  const I18N_RETRO = /^\s*(как |почему |что известно|что произошло|як |чому |що відомо|що сталося|كيف |لماذا |ماذا نعرف|ما الذي نعرفه)/i;
+
+  function classifyI18n(text, lang, category, target) {
+    const rules = I18N[lang];
+    if (rules.negative.test(text) || I18N_RETRO.test(text.replace(/^[^.:!?]{0,60}[.:!?]\s+/, "")) || I18N_RETRO.test(text)) return null;
+    const acted = rules.action.test(text);
+    for (const [type, re] of rules.types) {
+      const m = text.match(re);
+      if (!m) continue;
+      if (!acted && type !== "wildfire" && type !== "environment") continue;
+      if (type === "fire" && !FIRE_TARGETS.has(target)) continue;
+      if (type === "other" && !OTHER_CATEGORIES.has(category)) return null;
+      return { type, term: m[1] || m[0] };
+    }
+    return null;
+  }
+
+  function matchTargetI18n(text, lang) {
+    for (const [key, re] of I18N[lang].targets) {
+      const m = text.match(re);
+      if (m) return { key, term: (m[1] || m[0]).trim() };
+    }
+    return null;
+  }
+
+  // Like locate, for Arabic or Cyrillic text (already normalized).
+  function locateI18n(matcher, text, lang) {
+    const re = lang === "ar" ? matcher.araRegex : matcher.cyrRegex;
+    if (!re) return null;
+    const rules = I18N[lang];
+    let best = null;
+    for (const m of text.matchAll(re)) {
+      const prefix = lang === "ar" ? m[1] : "";
+      const name = lang === "ar" ? m[2] : m[1];
+      const entry = matcher.i18n.get(name);
+      if (!entry) continue;
+      const after = text.slice(m.index + m[0].length, m.index + m[0].length + 30);
+      if (rules.speaker.test(after)) continue;
+      const before = text.slice(Math.max(0, m.index - 24), m.index).toLowerCase().match(/([\p{L}]+)[\s,]*$/u);
+      const cued = (before && rules.cues.has(before[1])) || /ب/.test(prefix);
+      if (entry.precision === "country" && !cued) continue;
+      const score = RANK[entry.precision] * 10 + (cued ? 4 : 0) - m.index / 10000;
+      if (!best || score > best.score) best = { ...entry, score, term: m[0].trim(), cue: cued && before ? before[1] : null };
+    }
+    return best;
+  }
+
   const RANK = { city: 3, region: 2, country: 1 };
   const RADIUS_KM = { city: 10, region: 100, country: 300 };
 
@@ -141,7 +354,31 @@ var MeridianExtract = (function () {
       .sort((a, b) => b.length - a.length)
       .map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
       .join("|");
-    return { regex: new RegExp(`(?<![\\p{L}\\p{N}])(${alternation})(?![\\p{L}\\p{N}])`, "gu"), entries, regions };
+    // Arabic, Russian and Ukrainian names (names-i18n.js) point at the entries above.
+    const i18n = new Map();
+    const missing = [];
+    for (const raw of (typeof I18N_NAMES === "string" ? I18N_NAMES : "").split("\n")) {
+      const line = raw.trim();
+      if (!line) continue;
+      const [english, names] = line.split("|");
+      const entry = entries.get(english);
+      if (!entry) { missing.push(english); continue; }
+      for (const n of names.split(";").map((s) => s.trim()).filter(Boolean)) i18n.set(normalizeI18n(n), entry);
+    }
+    const escape = (n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const byLength = (a, b) => b.length - a.length;
+    const cyr = [...i18n.keys()].filter((n) => CYRILLIC.test(n)).sort(byLength).map(escape).join("|");
+    const ara = [...i18n.keys()].filter((n) => ARABIC.test(n)).sort(byLength).map(escape).join("|");
+    return {
+      regex: new RegExp(`(?<![\\p{L}\\p{N}])(${alternation})(?![\\p{L}\\p{N}])`, "gu"),
+      entries,
+      regions,
+      i18n,
+      missingI18n: missing,
+      // A stem plus up to 3 more letters (case endings); a name with an attached و ف ب ل ك in front.
+      cyrRegex: cyr ? new RegExp(`(?<![\\p{L}])(${cyr})[\\p{L}'’]{0,3}(?![\\p{L}])`, "gu") : null,
+      araRegex: ara ? new RegExp(`(?<![\\p{L}])([وفبلك]{0,2})(${ara})(?![\\p{L}])`, "gu") : null,
+    };
   }
 
   // A place followed by one of these is the speaker ("Russia says", "Moscow warns"), not where it happened.
@@ -249,6 +486,8 @@ var MeridianExtract = (function () {
     const t = Date.parse(raw.published);
     if (!Number.isFinite(t)) return null;
     const item = normalize(raw);
+    const lang = langOf(item.title);
+    if (lang !== "en") return toMentionI18n(matcher, item, t, lang);
     if (RETRO.test(item.title) || namesOtherMonth(item.title, t)) return null;
     // Headline only: summaries mention too much else (a surgery story is not a hospital strike).
     let hit = matchTarget(item.title);
@@ -272,6 +511,8 @@ var MeridianExtract = (function () {
       why: { type: kind.term, place: place.term, cue: place.cue, target: hit ? hit.term : null },
       // Wire agency the item credits, if any; the source itself when it is one.
       wire: wireOf(`${item.title} ${item.summary || ""}`),
+      when: whenOf(item.title, new Date(t).toISOString(), "en"),
+      lang: "en",
       id: item.id,
       published: new Date(t).toISOString(),
       title: item.title,
@@ -283,5 +524,35 @@ var MeridianExtract = (function () {
     };
   }
 
-  return { RANK, RADIUS_KM, buildMatcher, locate, classify, detectTarget, wireOf, toMention };
+  // toMention for Arabic, Russian or Ukrainian items.
+  function toMentionI18n(matcher, item, t, lang) {
+    const text = normalizeI18n(item.title);
+    const hit = matchTargetI18n(text, lang);
+    const kind = classifyI18n(text, lang, item.category, hit && hit.key);
+    if (!kind) return null;
+    let place = locateI18n(matcher, text, lang);
+    if (!place && !item.social && item.summary && langOf(item.summary) === lang) {
+      const fromSummary = locateI18n(matcher, normalizeI18n(item.summary), lang);
+      if (fromSummary && fromSummary.precision !== "country") place = fromSummary;
+    }
+    if (!place) return null;
+    const published = new Date(t).toISOString();
+    return {
+      target: hit ? hit.key : null,
+      why: { type: kind.term, place: place.term, cue: place.cue, target: hit ? hit.term : null },
+      wire: wireOf(`${item.title} ${item.summary || ""}`),
+      when: whenOf(text, published, lang),
+      lang,
+      id: item.id,
+      published,
+      title: item.title,
+      url: item.url,
+      source: item.source,
+      social: !!item.social,
+      type: kind.type,
+      place: { name: place.display, country: place.country, lat: round3(place.lat), lng: round3(place.lng), precision: place.precision },
+    };
+  }
+
+  return { RANK, RADIUS_KM, buildMatcher, locate, classify, detectTarget, wireOf, whenOf, langOf, toMention };
 })();

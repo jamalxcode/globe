@@ -1,0 +1,84 @@
+{
+  "_note": "Scenarios for events.js. Each report: src (outlet), title, at (minutes after 'base'), type, place (a name from 'places' below), optional social, wire, target, when ('overnight'). 'fires' are satellite points [place, km east, minutes after base]. expect: number of events and facts about the first (newest) event; checkAt (minutes after base) is the 'now' used for offMap.",
+  "base": "2026-10-07T00:00:00Z",
+  "places": {
+    "Kyiv": { "name": "Kyiv", "country": "Ukraine", "lat": 50.45, "lng": 30.52, "precision": "city" },
+    "Kyiv suburb": { "name": "Kyiv", "country": "Ukraine", "lat": 50.48, "lng": 30.60, "precision": "city" },
+    "Bila Tserkva": { "name": "Bila Tserkva", "country": "Ukraine", "lat": 49.80, "lng": 30.11, "precision": "city" },
+    "Ukraine": { "name": "Ukraine", "country": "Ukraine", "lat": 49.0, "lng": 31.4, "precision": "country" },
+    "Belgorod": { "name": "Belgorod", "country": "Russia", "lat": 50.60, "lng": 36.59, "precision": "city" },
+    "Kursk Region": { "name": "Kursk Region", "country": "Russia", "lat": 51.74, "lng": 36.29, "precision": "region" },
+    "Moscow": { "name": "Moscow", "country": "Russia", "lat": 55.76, "lng": 37.62, "precision": "city" }
+  },
+  "cases": [
+    { "why": "same owner counts once (RT + Sputnik)", "reports": [
+        { "src": "RT", "title": "Drone hits Belgorod substation", "at": 0, "type": "drone", "place": "Belgorod" },
+        { "src": "Sputnik", "title": "Ukrainian UAV strikes power facility in Belgorod", "at": 20, "type": "drone", "place": "Belgorod" } ],
+      "expect": { "events": 1, "source_count": 1, "status": "unverified" } },
+    { "why": "two independent outlets", "reports": [
+        { "src": "Reuters", "title": "Drone attack sets Belgorod substation on fire", "at": 0, "type": "drone", "place": "Belgorod" },
+        { "src": "AP", "title": "Ukraine strikes power site in Russia's Belgorod", "at": 30, "type": "drone", "place": "Belgorod" } ],
+      "expect": { "events": 1, "source_count": 2, "status": "corroborated" } },
+    { "why": "near-identical reprint counts once", "reports": [
+        { "src": "NDTV", "title": "Russian drone strike kills 3 in Kyiv, officials say", "at": 0, "type": "drone", "place": "Kyiv" },
+        { "src": "The Hindu", "title": "Russian drone strike kills 3 in Kyiv: officials", "at": 10, "type": "drone", "place": "Kyiv" } ],
+      "expect": { "events": 1, "source_count": 1 } },
+    { "why": "crediting a wire = that wire", "reports": [
+        { "src": "Clash Report", "title": "Moscow oil depot ablaze after drone attack", "at": 0, "type": "drone", "place": "Moscow", "social": true, "wire": "Reuters" },
+        { "src": "Reuters", "title": "Fire at Moscow-region oil depot after Ukrainian drones", "at": 15, "type": "drone", "place": "Moscow" } ],
+      "expect": { "events": 1, "source_count": 1, "weak": false } },
+    { "why": "same facts in own words stay separate", "reports": [
+        { "src": "Meduza", "title": "Massive Ukrainian drone attack on Moscow and surrounding region kills two, sets largest oil depot ablaze", "at": 0, "type": "drone", "place": "Moscow" },
+        { "src": "Moscow Times", "title": "2 Killed in Massive Ukrainian Drone Attack on Moscow", "at": 20, "type": "drone", "place": "Moscow" } ],
+      "expect": { "events": 1, "source_count": 2 } },
+    { "why": "drone + missile in one city = one combined attack", "reports": [
+        { "src": "Kyiv Independent", "title": "Drones attack Kyiv overnight", "at": 0, "type": "drone", "place": "Kyiv" },
+        { "src": "Ukrinform", "title": "Missile hits Kyiv high-rise", "at": 60, "type": "missile", "place": "Kyiv suburb" } ],
+      "expect": { "events": 1, "combined": true, "types": ["drone", "missile"] } },
+    { "why": "no combined attack across a whole country", "reports": [
+        { "src": "NOELreports", "title": "Drones over Ukraine", "at": 0, "type": "drone", "place": "Ukraine", "social": true },
+        { "src": "ISW", "title": "Missiles launched at Ukraine", "at": 30, "type": "missile", "place": "Ukraine", "social": true } ],
+      "expect": { "events": 2 } },
+    { "why": "different cities stay separate", "reports": [
+        { "src": "Reuters", "title": "Drone hits Kyiv", "at": 0, "type": "drone", "place": "Kyiv" },
+        { "src": "AP", "title": "Missile hits Bila Tserkva", "at": 20, "type": "missile", "place": "Bila Tserkva" } ],
+      "expect": { "events": 2 } },
+    { "why": "more than 3 hours apart = separate", "reports": [
+        { "src": "Reuters", "title": "Drone hits Kyiv", "at": 0, "type": "drone", "place": "Kyiv" },
+        { "src": "AP", "title": "Drone hits Kyiv again", "at": 240, "type": "drone", "place": "Kyiv" } ],
+      "expect": { "events": 2 } },
+    { "why": "explosion report joins the drone attack, not combined", "reports": [
+        { "src": "Reuters", "title": "Explosions heard in Kyiv", "at": 0, "type": "explosion", "place": "Kyiv" },
+        { "src": "AP", "title": "Drones attack Kyiv", "at": 15, "type": "drone", "place": "Kyiv" } ],
+      "expect": { "events": 1, "event_type": "drone", "combined": false } },
+    { "why": "single social post: weak, still on the map at 5 h", "reports": [
+        { "src": "WarMonitors", "title": "Explosion reported in Belgorod", "at": 0, "type": "explosion", "place": "Belgorod", "social": true } ],
+      "checkAt": 300, "expect": { "events": 1, "weak": true, "offMap": false } },
+    { "why": "single social post: off the map after 6 h", "reports": [
+        { "src": "WarMonitors", "title": "Explosion reported in Belgorod", "at": 0, "type": "explosion", "place": "Belgorod", "social": true } ],
+      "checkAt": 420, "expect": { "events": 1, "weak": true, "offMap": true } },
+    { "why": "country-only single source is weak", "reports": [
+        { "src": "BBC", "title": "Drone attacks across Ukraine", "at": 0, "type": "drone", "place": "Ukraine" } ],
+      "expect": { "events": 1, "weak": true } },
+    { "why": "satellite heat nearby makes a social post not weak", "reports": [
+        { "src": "WarMonitors", "title": "Explosion reported in Belgorod", "at": 0, "type": "explosion", "place": "Belgorod", "social": true } ],
+      "fires": [["Belgorod", 3, 60]], "checkAt": 600, "expect": { "events": 1, "satellite": true, "weak": false, "offMap": false } },
+    { "why": "satellite heat two days earlier doesn't count", "reports": [
+        { "src": "Reuters", "title": "Explosion in Belgorod", "at": 0, "type": "explosion", "place": "Belgorod" } ],
+      "fires": [["Belgorod", 3, -2880]], "expect": { "events": 1, "satellite": false } },
+    { "why": "satellite heat 15 km away doesn't count", "reports": [
+        { "src": "Reuters", "title": "Explosion in Belgorod", "at": 0, "type": "explosion", "place": "Belgorod" } ],
+      "fires": [["Belgorod", 15, 30]], "expect": { "events": 1, "satellite": false } },
+    { "why": "no satellite match for a region", "reports": [
+        { "src": "Reuters", "title": "Drone strike in Kursk region", "at": 0, "type": "drone", "place": "Kursk Region" } ],
+      "fires": [["Kursk Region", 1, 30]], "expect": { "events": 1, "satellite": false } },
+    { "why": "overnight wording lets earlier heat count", "reports": [
+        { "src": "Reuters", "title": "Overnight drone attack on Belgorod", "at": 600, "type": "drone", "place": "Belgorod", "when": "overnight" } ],
+      "fires": [["Belgorod", 2, -60]], "expect": { "events": 1, "satellite": true, "when": "overnight" } },
+    { "why": "target is the one most headlines name", "reports": [
+        { "src": "Reuters", "title": "Drone hits Moscow oil depot", "at": 0, "type": "drone", "place": "Moscow", "target": "fuel" },
+        { "src": "AP", "title": "Moscow fuel depot on fire after drone attack", "at": 10, "type": "drone", "place": "Moscow", "target": "fuel" },
+        { "src": "BBC", "title": "Drone hits Moscow warehouse", "at": 20, "type": "drone", "place": "Moscow", "target": "industry" } ],
+      "expect": { "events": 1, "target": "fuel", "source_count": 3 } }
+  ]
+}

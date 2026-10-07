@@ -1,29 +1,17 @@
-// Meridian: a live equal-area map of reported strikes and explosions.
-// Runs entirely in the browser. Headlines come from news.sala.company's feed.json (rebuilt every ~5 min
-// on GitHub, keeps 48 hours) plus the feed's Bluesky accounts, polled live.
-// extract.js turns each headline that names a kind of strike and a known place into a mention; mentions
-// of the same kind within 50 km and 3 hours merge into one event.
-// Hollow ring = one source. Solid dot = two or more independent sources (see independentGroups).
+// Meridian: a live equal-area map of reported strikes, explosions, fires and environmental incidents.
+// Runs entirely in the browser. Headlines come from news.sala.company's feed.json and local.json (Arabic,
+// Russian, Ukrainian), rebuilt every ~5 min on GitHub and covering 48 hours, plus the feed's Bluesky accounts,
+// polled live. extract.js turns each headline into a mention; events.js merges mentions into events.
+// Hollow ring = one source. Solid dot = two or more independent sources.
 "use strict";
 
 const FEED_URL = "https://news.sala.company/feed.json";
+const LOCAL_URL = "https://news.sala.company/local.json"; // non-English sources, built for this map
 const ATLAS_URL = "vendor/countries-50m.json"; // world-atlas 2.0.2 (Natural Earth country shapes), kept in the repo
+const FIRES_URL = "fires.json"; // satellite heat, NASA FIRMS, refreshed hourly by the deploy workflow
 const POLL_S = 60;
-const MERGE_KM = 50;
-const MERGE_MS = 3 * 3600e3;
-const MAX_EVENTS = 500;
 const STALE_MIN = 20; // feed older than this shows "Delayed"
-// A weak report (one source that is only social posts, or that only names a whole country) shows faintly,
-// and leaves the map if no second independent source backs it up within this many hours.
-const WEAK_HOURS = 6;
-// Satellite heat (fires.json, NASA FIRMS, refreshed hourly by the deploy workflow): a detection this close to a
-// city event, from SAT_BEFORE_H before its first report to SAT_AFTER_H after its last, is noted on the event.
-const FIRES_URL = "fires.json";
-const SAT_KM = 10;
-const SAT_BEFORE_H = 12;
-const SAT_AFTER_H = 24;
-// Kinds of event where heat is expected; a shelling or missile hit on a city block often shows, a spill doesn't.
-const SAT_TYPES = new Set(["airstrike", "missile", "explosion", "shelling", "drone", "fire", "wildfire", "other"]);
+const { WEAK_HOURS, SAT_KM } = MeridianEvents;
 // The feed keeps 48 hours, so that's the longest range.
 const WINDOWS = [
   { h: 1, label: "1h", long: "hour" },
@@ -36,10 +24,17 @@ const DEFAULT_WINDOW_H = 24;
 
 const EVENT_TYPES = ["airstrike", "missile", "explosion", "shelling", "drone", "fire", "wildfire", "environment", "other"];
 const TYPE_LABEL = { airstrike: "Airstrike", missile: "Missile", explosion: "Explosion", shelling: "Shelling", drone: "Drone", fire: "Fire", wildfire: "Wildfire", environment: "Environmental", other: "Other" };
-// How specific a type is: when reports merge, the event takes the most specific one
-// (a "refinery fire" report and a "drone strike" report at the same place make a drone event).
-const TYPE_RANK = { other: 0, fire: 1, explosion: 2, airstrike: 3, missile: 3, shelling: 3, drone: 3, wildfire: 3, environment: 3 };
-const { RANK, RADIUS_KM } = MeridianExtract;
+
+// "Drone" or, for a combined attack, "Drone + missile".
+function typeLabel(ev) {
+  if (!ev.combined) return TYPE_LABEL[ev.event_type];
+  return ev.weapons.map((t, i) => (i ? TYPE_LABEL[t].toLowerCase() : TYPE_LABEL[t])).join(" + ");
+}
+
+// Icons for an event's kinds: one, or each weapon of a combined attack.
+function typeIcons(ev) {
+  return (ev.combined ? ev.weapons : [ev.event_type]).map((t) => typeIcon(t)).join("");
+}
 
 // What was hit (see TARGET_RULES in extract.js): label and a 24x24 line icon, adapted from Lucide (ISC).
 const TARGETS = {
@@ -110,130 +105,6 @@ function esc(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
-function haversineKm(lat1, lng1, lat2, lng2) {
-  const toRad = Math.PI / 180;
-  const s1 = Math.sin(((lat2 - lat1) * toRad) / 2);
-  const s2 = Math.sin(((lng2 - lng1) * toRad) / 2);
-  const a = s1 * s1 + Math.cos(lat1 * toRad) * Math.cos(lat2 * toRad) * s2 * s2;
-  return 2 * 6371 * Math.asin(Math.min(1, Math.sqrt(a)));
-}
-
-// ---------- independent sources ----------
-
-// Outlets with the same owner count as one source. Names as the feed (or Google News) spells them.
-const OWNER_GROUPS = {
-  "Russian state media": ["RT", "Sputnik", "TASS", "RIA Novosti"],
-  "Turkish state media": ["Anadolu", "Anadolu Agency", "TRT World"],
-  "Ukrainian state media": ["Ukrinform"],
-  "Chinese state media": ["CGTN", "Xinhua", "Global Times", "China Daily"],
-  "Iranian state media": ["Press TV", "IRNA", "Tasnim", "Fars"],
-  "Al Jazeera": ["Al Jazeera", "Al Jazeera English"],
-  BBC: ["BBC", "BBC News", "BBC Middle East"],
-  DW: ["DW", "DW News"],
-  AP: ["AP", "AP News", "Associated Press", "The Associated Press"],
-};
-const OWNER_OF = new Map(Object.entries(OWNER_GROUPS).flatMap(([group, names]) => names.map((n) => [n.toLowerCase(), group])));
-
-function ownerOf(source) {
-  return OWNER_OF.get(source.toLowerCase()) || source;
-}
-
-const SIMILAR_SKIP = new Set("the and for from with after over says said into amid near this that their its are was were has have had new".split(" "));
-
-function keywords(title) {
-  return new Set(title.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length > 2 && !SIMILAR_SKIP.has(w)));
-}
-
-// Near-identical headlines (a reprint, maybe lightly edited): at least 4 shared words, and 70% of all the words
-// in both are shared. Two newsrooms describing the same facts in their own words stay separate.
-function nearIdentical(a, b) {
-  let shared = 0;
-  for (const w of a) if (b.has(w)) shared++;
-  return shared >= 4 && shared / (a.size + b.size - shared) >= 0.7;
-}
-
-// Splits an event's reports into independent sources. Reports join one source when they credit the same wire
-// agency (or are it), come from outlets with the same owner, or have near-identical headlines (reprints).
-// Returns [{ name, reasons: Set, reports }].
-function independentGroups(reports) {
-  const parent = reports.map((_, i) => i);
-  const reasons = reports.map(() => new Set());
-  const find = (i) => (parent[i] === i ? i : (parent[i] = find(parent[i])));
-  const join = (a, b, reason) => {
-    a = find(a);
-    b = find(b);
-    if (a !== b) { parent[b] = a; for (const r of reasons[b]) reasons[a].add(r); }
-    if (reason) reasons[a].add(reason);
-  };
-  const firstByKey = new Map();
-  reports.forEach((r, i) => {
-    const key = r.wire || ownerOf(r.source);
-    if (!firstByKey.has(key)) { firstByKey.set(key, i); return; }
-    const other = reports[firstByKey.get(key)];
-    if (other.source === r.source && !r.wire) join(firstByKey.get(key), i, null); // same outlet twice
-    else if (r.wire || key === r.source) join(firstByKey.get(key), i, `same ${key} story`); // credits the wire, or is it
-    else join(firstByKey.get(key), i, `same owner: ${key}`);
-  });
-  const words = reports.map((r) => keywords(r.title));
-  for (let i = 0; i < reports.length; i++) {
-    for (let j = i + 1; j < reports.length; j++) {
-      if (find(i) !== find(j) && nearIdentical(words[i], words[j])) join(i, j, "near-identical headlines");
-    }
-  }
-  const groups = new Map();
-  reports.forEach((r, i) => {
-    const root = find(i);
-    if (!groups.has(root)) groups.set(root, { name: r.wire || ownerOf(r.source), reasons: reasons[root], reports: [] });
-    groups.get(root).reports.push(r);
-  });
-  return [...groups.values()];
-}
-
-// ---------- satellite heat ----------
-
-let fires = null; // { generated_at, points: [[lat, lng, minutes, frp]], grid: Map("lat,lng" -> points) }
-
-async function loadFires() {
-  try {
-    const res = await fetch(`${FIRES_URL}?t=${Date.now()}`, { cache: "no-store" });
-    if (!res.ok) return false;
-    const data = await res.json();
-    const grid = new Map();
-    for (const p of data.points || []) {
-      const key = `${Math.floor(p[0])},${Math.floor(p[1])}`;
-      if (!grid.has(key)) grid.set(key, []);
-      grid.get(key).push(p);
-    }
-    fires = { generated_at: data.generated_at, grid };
-    return true;
-  } catch {
-    return false; // no file yet (no key), or offline: no satellite notes
-  }
-}
-
-// The nearest detection within SAT_KM of a city event, in its time window: { km, time, frp } or null.
-function satelliteHeat(ev) {
-  if (!fires || ev.precision !== "city" || !SAT_TYPES.has(ev.event_type)) return null;
-  const from = (Date.parse(ev.first_seen) - SAT_BEFORE_H * 3600e3) / 60000;
-  const to = (ev.lastT + SAT_AFTER_H * 3600e3) / 60000;
-  let best = null;
-  for (let dy = -1; dy <= 1; dy++) {
-    for (let dx = -1; dx <= 1; dx++) {
-      for (const [lat, lng, minutes, frp] of fires.grid.get(`${Math.floor(ev.lat) + dy},${Math.floor(ev.lng) + dx}`) || []) {
-        if (minutes < from || minutes > to) continue;
-        const d = haversineKm(ev.lat, ev.lng, lat, lng);
-        if (d <= SAT_KM && (!best || d < best.km)) best = { km: d, time: new Date(minutes * 60000).toISOString(), frp };
-      }
-    }
-  }
-  return best;
-}
-
-// Explosions, fires and "other" can be part of any attack; two specific kinds (drone vs shelling) stay apart.
-function typesCompatible(a, b) {
-  return a === b || TYPE_RANK[a] < 3 || TYPE_RANK[b] < 3;
-}
-
 function relativeTime(iso, now) {
   const seconds = Math.max(0, Math.round((now - Date.parse(iso)) / 1000));
   if (seconds < 10) return "just now";
@@ -267,8 +138,9 @@ const ICON_X = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"
 
 // ---------- mentions -> events ----------
 
+// Main feed, non-English feed and live Bluesky posts, without duplicates.
 function allItems() {
-  const items = state.data ? state.data.items || [] : [];
+  const items = (state.data ? state.data.items || [] : []).concat(feeds.local.data ? feeds.local.data.items || [] : []);
   const ids = new Set(items.map((i) => i.id));
   const urls = new Set(items.map((i) => i.url));
   const extra = [...state.live.values()].filter((i) => !ids.has(i.id) && !urls.has(i.url));
@@ -286,77 +158,10 @@ function windowMentions() {
   return out.sort((a, b) => Date.parse(a.published) - Date.parse(b.published));
 }
 
-function buildEvents(mentions) {
-  const events = [];
-  let open = []; // events still within MERGE_MS of the current mention
-  for (const m of mentions) {
-    const t = Date.parse(m.published);
-    open = open.filter((ev) => t - ev.lastT <= MERGE_MS);
-    let best = null;
-    let bestDist = Infinity;
-    for (const ev of open) {
-      if (!typesCompatible(ev.event_type, m.type)) continue;
-      const d = haversineKm(ev.lat, ev.lng, m.place.lat, m.place.lng);
-      if (d <= MERGE_KM && d < bestDist) { best = ev; bestDist = d; }
-    }
-    const report = {
-      source: m.source, title: m.title, url: m.url, published: m.published, social: m.social, id: m.id,
-      target: m.target, type: m.type, wire: m.wire, why: m.why, placeName: m.place.name, precision: m.place.precision,
-    };
-    if (best) {
-      if (!best.urls.has(report.url)) { best.urls.add(report.url); best.reports.push(report); }
-      best.sources.add(report.source);
-      best.lastT = t;
-      best.last_updated = m.published;
-      if (TYPE_RANK[m.type] > TYPE_RANK[best.event_type]) best.event_type = m.type;
-      if (RANK[m.place.precision] > RANK[best.precision]) {
-        Object.assign(best, { lat: m.place.lat, lng: m.place.lng, location_name: m.place.name, country: m.place.country, precision: m.place.precision, radius_km: RADIUS_KM[m.place.precision] });
-      }
-      continue;
-    }
-    const ev = {
-      id: "e_" + m.id,
-      lat: m.place.lat,
-      lng: m.place.lng,
-      event_type: m.type,
-      location_name: m.place.name,
-      country: m.place.country,
-      precision: m.place.precision,
-      radius_km: RADIUS_KM[m.place.precision],
-      first_seen: m.published,
-      last_updated: m.published,
-      lastT: t,
-      reports: [report],
-      urls: new Set([report.url]),
-      sources: new Set([report.source]),
-    };
-    events.push(ev);
-    open.push(ev);
-  }
-  for (const ev of events) {
-    ev.groups = independentGroups(ev.reports);
-    ev.source_count = ev.groups.length; // independent sources
-    ev.outlet_count = ev.sources.size;  // outlet names, before counting reprints and owners once
-    ev.status = ev.source_count >= 2 ? "corroborated" : "unverified";
-    ev.satellite = satelliteHeat(ev);
-    // A social post that credits a wire agency ("Source: Reuters") isn't a lone social claim, and satellite heat
-    // near the place is independent evidence.
-    ev.weak = !ev.satellite && ev.source_count === 1 && (ev.reports.every((r) => r.social && !r.wire) || ev.precision === "country");
-    ev.reports.sort((a, b) => Date.parse(b.published) - Date.parse(a.published));
-    // The target most of its headlines name; on a tie, the one the newest headline names.
-    const votes = new Map();
-    for (const r of ev.reports) if (r.target) votes.set(r.target, (votes.get(r.target) || 0) + 1);
-    ev.target = null;
-    for (const [target, n] of votes) if (!ev.target || n > votes.get(ev.target)) ev.target = target;
-  }
-  events.sort((a, b) => b.lastT - a.lastT);
-  return events.slice(0, MAX_EVENTS);
-}
-
 // flash: animate events that are new since the last refresh (not when the range changes).
 function rebuild(flash = true) {
   if (!matcher || !state.data) return;
-  const events = buildEvents(windowMentions());
+  const events = MeridianEvents.buildEvents(windowMentions(), { fires: fires && fires.grid });
   const flashes = [];
   for (const ev of events) {
     const prev = state.prevStatus.get(ev.id);
@@ -373,17 +178,61 @@ function rebuild(flash = true) {
 
 // ---------- loading ----------
 
+const feeds = {
+  main: { url: FEED_URL, data: null, lastModified: null, nextBust: 0 },
+  local: { url: LOCAL_URL, data: null, lastModified: null, nextBust: 0 },
+};
+// Builds run every ~5 min and take a few; a copy older than this may be a CDN edge serving an old build.
+const SUSPECT_AGE_MS = 12 * 60e3;
+const BUST_EVERY_MS = 5 * 60e3;
+
+// Fetches a feed only if it changed. "no-cache" makes the browser ask GitHub whether the file changed (it
+// sends the ETag it has); an unchanged file comes back as a tiny "304 Not Modified" and the browser reuses its
+// copy, so polling every minute costs almost nothing between builds. If the copy looks old, a request bypasses
+// all caches, at most once every BUST_EVERY_MS (a build that's simply late shouldn't cost a download a minute).
+// Returns true if there's new data.
+async function fetchFeed(feed) {
+  const old = feed.data && Date.now() - Date.parse(feed.data.generated_at) > SUSPECT_AGE_MS;
+  const bust = old && Date.now() >= feed.nextBust;
+  if (bust) feed.nextBust = Date.now() + BUST_EVERY_MS;
+  const res = await fetch(bust ? `${feed.url}?t=${Date.now()}` : feed.url, { cache: bust ? "no-store" : "no-cache" });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const modified = res.headers.get("Last-Modified");
+  if (feed.data && modified && modified === feed.lastModified) return false;
+  feed.data = await res.json();
+  feed.lastModified = modified;
+  return true;
+}
+
 async function loadFeed() {
+  let changed = false;
   try {
-    const res = await fetch(`${FEED_URL}?t=${Date.now()}`, { cache: "no-store" });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    state.data = await res.json();
+    changed = await fetchFeed(feeds.main);
+    state.data = feeds.main.data;
     state.feedOk = true;
   } catch {
     state.feedOk = false;
   }
+  try {
+    changed = (await fetchFeed(feeds.local)) || changed;
+  } catch { /* the map works without the non-English feed */ }
   updateStatus();
-  rebuild();
+  if (changed) rebuild();
+}
+
+let fires = null; // { generated_at, grid } from fires.json
+
+async function loadFires() {
+  try {
+    const res = await fetch(FIRES_URL, { cache: "no-cache" });
+    if (!res.ok) return false;
+    const data = await res.json();
+    if (fires && fires.generated_at === data.generated_at) return false;
+    fires = { generated_at: data.generated_at, grid: MeridianEvents.fireGrid(data.points) };
+    return true;
+  } catch {
+    return false; // no file, or offline: no satellite notes
+  }
 }
 
 // Bluesky's public API allows browser requests, so between feed builds the page asks the
@@ -452,7 +301,7 @@ function updateStatus() {
 // ---------- filters ----------
 
 function passes(ev) {
-  if (!state.enabled[ev.event_type]) return false;
+  if (![...ev.types].some((t) => state.enabled[t])) return false;
   if (state.corroboratedOnly && ev.status !== "corroborated") return false;
   return ev.lastT >= Date.now() - state.windowH * 3600e3;
 }
@@ -463,13 +312,13 @@ function filtered() {
 
 function fadeFor(ev, now) {
   const age = now - ev.lastT;
-  const fade = Math.max(0.3, 1 - age / (state.windowH * 3600e3));
-  return ev.weak ? fade * 0.55 : fade;
+  const fade = Math.max(0.35, 1 - age / (state.windowH * 3600e3));
+  // Weak reports are fainter, but not so faint they disappear: their dashed outline (style.css) marks them too.
+  return ev.weak ? Math.max(0.4, fade * 0.75) : fade;
 }
 
-// A weak event nothing else confirmed within WEAK_HOURS of its first report: kept in the list, off the map.
 function offMap(ev, now = Date.now()) {
-  return ev.weak && now - Date.parse(ev.first_seen) > WEAK_HOURS * 3600e3;
+  return MeridianEvents.offMap(ev, now);
 }
 
 // ---------- map ----------
@@ -489,7 +338,14 @@ const countriesG = root.append("g");
 const bordersEl = root.append("path").attr("class", "borders");
 const discsG = root.append("g");
 const dotsG = root.append("g");
+const clustersG = root.append("g");
 const burstsG = root.append("g");
+
+// Grouping: markers closer than CLUSTER_PX on screen merge into a numbered bubble, up to CLUSTER_MAX_K zoom.
+const CLUSTER_PX = 26;
+const CLUSTER_MAX_K = 6;
+let clusterK = 0; // zoom level the groups were last made for
+let clusters = new Map(); // id -> { events, x, y }
 
 const projection = d3.geoEqualEarth();
 const geoPath = d3.geoPath(projection);
@@ -504,8 +360,11 @@ const zoom = d3.zoom()
   .on("zoom", (e) => {
     k = e.transform.k;
     root.attr("transform", e.transform);
-    rescale();
-  });
+    // Regroup once the zoom has changed enough for groups to split or merge.
+    if (Math.abs(Math.log(k / (clusterK || k))) > 0.25) drawEvents();
+    else rescale();
+  })
+  .on("end", () => { if (k !== clusterK) drawEvents(); });
 svg.call(zoom).on("dblclick.zoom", null);
 
 function layout() {
@@ -538,9 +397,24 @@ function drawEvents() {
     .attr("d", (d) => geoPath(d3.geoCircle().center([d.lng, d.lat]).radius(d.radius_km / 111.2)()))
     .style("opacity", (d) => fadeFor(d, now));
 
+  // Group markers that would overlap at this zoom; the selected or hovered event always stays on its own.
+  const { singles, groups } = groupMarkers(list);
+  clustersG.selectAll("g.cluster").data(groups, (d) => d.id).join((enter) => {
+    const g = enter.append("g").attr("data-kind", "cluster").attr("data-id", (d) => d.id);
+    g.append("circle").attr("class", "core");
+    g.append("text");
+    g.append("circle").attr("class", "hit");
+    g.append("title");
+    return g;
+  })
+    .attr("class", (d) => `cluster ${d.events.some((e) => e.status === "corroborated") ? "multi" : "one"}`)
+    .attr("transform", (d) => `translate(${d.x},${d.y})`)
+    .call((g) => g.select("text").text((d) => d.events.length))
+    .call((g) => g.select("title").text((d) => clusterTitle(d)));
+
   // Every event gets a marker (at a disc's center for regions and countries): the event-type icon inside,
   // and a small badge with what was hit when the headlines say.
-  dotsG.selectAll("g.dot").data(list, (d) => d.id).join((enter) => {
+  dotsG.selectAll("g.dot").data(singles, (d) => d.id).join((enter) => {
     const g = enter.append("g").attr("data-kind", "event").attr("data-id", (d) => d.id);
     g.append("circle").attr("class", "halo");
     g.append("circle").attr("class", "core");
@@ -551,19 +425,107 @@ function drawEvents() {
     g.append("title");
     return g;
   })
-    .attr("class", (d) => `dot ${tone(d)}${hot(d)}`)
+    .attr("class", (d) => `dot ${tone(d)}${d.weak ? " weak" : ""}${hot(d)}`)
     .attr("transform", (d) => `translate(${projection([d.lng, d.lat])})`)
     .style("opacity", (d) => fadeFor(d, now))
     .call((g) => g.select(".glyph").attr("href", (d) => `#y-${d.event_type}`))
     .call((g) => g.select(".tglyph").attr("href", (d) => (d.target ? `#t-${d.target}` : null)))
-    .call((g) => g.select("title").text((d) => `${d.location_name}: ${TYPE_LABEL[d.event_type]}${d.target ? ` · ${TARGETS[d.target].label}` : ""} · ${d.source_count} ${d.source_count === 1 ? "source" : "sources"}`))
+    .call((g) => g.select("title").text((d) => `${d.location_name}: ${typeLabel(d)}${d.target ? ` · ${TARGETS[d.target].label}` : ""} · ${d.source_count} ${d.source_count === 1 ? "source" : "sources"}`))
     .order();
   rescale();
+}
+
+// Splits events into single markers and groups of markers that would overlap on screen at the current zoom.
+function groupMarkers(list) {
+  clusterK = k;
+  clusters = new Map();
+  if (k >= CLUSTER_MAX_K) return { singles: list, groups: [] };
+  const size = CLUSTER_PX / k; // in map units, so the same on screen at any zoom
+  const keep = (d) => state.hover === d.id || (state.selection && state.selection.id === d.id);
+  const singles = [];
+  // Each marker joins the nearest group whose center is closer than `size`, then groups that ended up
+  // overlapping merge, until nothing is closer than `size`.
+  let piles = [];
+  for (const d of list) {
+    if (keep(d)) { singles.push(d); continue; }
+    const [x, y] = projection([d.lng, d.lat]);
+    let near = null;
+    let nearDist = size;
+    for (const p of piles) {
+      const dist = Math.hypot(p.x - x, p.y - y);
+      if (dist < nearDist) { near = p; nearDist = dist; }
+    }
+    if (near) {
+      near.events.push(d);
+      near.x += (x - near.x) / near.events.length;
+      near.y += (y - near.y) / near.events.length;
+    } else piles.push({ events: [d], x, y });
+  }
+  for (let merged = true; merged;) {
+    merged = false;
+    for (let i = 0; i < piles.length && !merged; i++) {
+      for (let j = i + 1; j < piles.length; j++) {
+        const a = piles[i];
+        const b = piles[j];
+        if (Math.hypot(a.x - b.x, a.y - b.y) >= size) continue;
+        const n = a.events.length + b.events.length;
+        a.x = (a.x * a.events.length + b.x * b.events.length) / n;
+        a.y = (a.y * a.events.length + b.y * b.events.length) / n;
+        a.events.push(...b.events);
+        piles.splice(j, 1);
+        merged = true;
+        break;
+      }
+    }
+  }
+  const groups = [];
+  for (const p of piles) {
+    if (p.events.length === 1) { singles.push(p.events[0]); continue; }
+    // Named after its members, so a group keeps its identity while it doesn't change.
+    p.id = `c_${p.events.map((e) => e.id).sort()[0]}`;
+    clusters.set(p.id, p);
+    groups.push(p);
+  }
+  // Keep the oldest-first order for singles, so the newest draw on top.
+  const order = new Map(list.map((d, i) => [d.id, i]));
+  singles.sort((a, b) => order.get(a.id) - order.get(b.id));
+  return { singles, groups };
+}
+
+function clusterTitle(group) {
+  const counts = new Map();
+  for (const e of group.events) counts.set(typeLabel(e), (counts.get(typeLabel(e)) || 0) + 1);
+  const kinds = [...counts].sort((a, b) => b[1] - a[1]).map(([label, n]) => `${n} ${label.toLowerCase()}`).join(", ");
+  const places = [...new Set(group.events.map((e) => e.location_name))].slice(0, 4).join(", ");
+  return `${group.events.length} events: ${kinds}. ${places}${group.events.length > 4 ? "…" : ""}. Click to zoom in.`;
+}
+
+// Zooms in on a group until its markers separate.
+function zoomToCluster(id) {
+  const group = clusters.get(id);
+  if (!group) return;
+  const pts = group.events.map((e) => projection([e.lng, e.lat]));
+  const xs = pts.map((p) => p[0]);
+  const ys = pts.map((p) => p[1]);
+  const spread = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys), 1e-3);
+  // Enough to spread the group over about 4 marker widths, at least 2.5x more than now.
+  const kk = Math.min(60, Math.max(k * 2.5, (CLUSTER_PX * 4) / spread));
+  const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+  const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+  const t = d3.zoomIdentity.translate(W / 2 - cx * kk, H / 2 - cy * kk).scale(kk);
+  svg.interrupt().transition().duration(reduceMotion ? 0 : 700).ease(d3.easeCubicInOut).call(zoom.transform, t);
 }
 
 // Markers keep the same size on screen at every zoom level.
 function rescale() {
   const s = 1 / k;
+  clustersG.selectAll("g.cluster").each(function (d) {
+    const r = Math.min(22, 12 + Math.sqrt(d.events.length) * 2.5) * s;
+    const g = d3.select(this);
+    g.select(".core").attr("r", r);
+    g.select(".hit").attr("r", r + 3 * s);
+    g.select("text").attr("font-size", 11.5 * s).attr("dy", 4 * s);
+  });
   dotsG.selectAll("g.dot").each(function (d) {
     const big = state.hover === d.id || (state.selection && state.selection.id === d.id) ? 1.4 : 1;
     const r = 10.5 * s * big;
@@ -668,11 +630,17 @@ function pick(kind, id) {
   }
 }
 
+let hoverPopped = false; // the hovered event was pulled out of a group to show it
+
 function setHover(id) {
   if (state.hover === id) return;
   state.hover = id;
   discsG.selectAll("path").classed("hot", (d) => d.id === id || (state.selection && state.selection.id === d.id));
-  rescale();
+  // An event hidden inside a group (hovered in the list) is pulled out while hovered, then put back.
+  const grouped = !!id && [...clusters.values()].some((g) => g.events.some((e) => e.id === id));
+  if (grouped || hoverPopped) drawEvents();
+  else rescale();
+  hoverPopped = grouped;
   document.querySelectorAll("[data-row-id]").forEach((el) => {
     el.classList.toggle("active", el.dataset.rowId === id || (state.selection && state.selection.id === el.dataset.rowId));
   });
@@ -680,7 +648,9 @@ function setHover(id) {
 
 svg.on("click", (e) => {
   const target = e.target.closest("[data-kind]");
-  if (target) pick(target.dataset.kind, target.dataset.id);
+  if (!target) return;
+  if (target.dataset.kind === "cluster") zoomToCluster(target.dataset.id);
+  else pick(target.dataset.kind, target.dataset.id);
 });
 svg.on("pointerover", (e) => {
   const target = e.target.closest("[data-kind]");
@@ -728,9 +698,9 @@ function renderFeed() {
       const hidden = offMap(ev, now);
       const weakNote = hidden ? `<span class="weak-note">Not confirmed within ${WEAK_HOURS} h: off the map</span>` : ev.weak ? `<span class="weak-note">${weakReason(ev)}: shown faintly until a second source confirms</span>` : "";
       return `<li><button type="button" class="row ${tone}${active ? " active" : ""}${hidden ? " off-map" : ""}" data-row-kind="event" data-row-id="${ev.id}">
-        <span class="line"><span class="type">${typeIcon(ev.event_type)}${TYPE_LABEL[ev.event_type]}${target}</span><span class="time">${relativeTime(ev.last_updated, now)}</span></span>
+        <span class="line"><span class="type">${typeIcons(ev)}${typeLabel(ev)}${target}</span><span class="time">${relativeTime(ev.last_updated, now)}</span></span>
         <span class="line"><span class="where">${esc(ev.location_name)}<span> · ${esc(ev.country)}</span></span>${tag}</span>
-        <span class="headline">${esc(ev.reports[0].title)}</span>${weakNote}
+        <span class="headline">${esc(ev.reports[0].title)}</span>${ev.when ? `<span class="when-note">Happened ${esc(ev.when.label)} (estimated)</span>` : ""}${weakNote}
       </button></li>`;
     }).join("");
   }
@@ -792,7 +762,7 @@ function renderCard() {
       <span><span class="src">${esc(r.source)}${r.social ? " · social" : ""}${r.wire && r.wire !== r.source ? ` · credits ${esc(r.wire)}` : ""} · ${relativeTime(r.published, now)}</span><span class="ttl">${markTerms(r.title, r.why ? [r.why.type, r.why.place, r.why.target] : [])}</span></span></a></li>`).join("");
     const target = ev.target ? `<p class="hit-target">${targetIcon(ev.target)}<span>Hit: ${esc(TARGETS[ev.target].label)} <span class="muted">(from the headlines)</span></span></p>` : "";
     const sourcesLabel = ev.source_count === 1 ? "1 source" : `${ev.source_count} independent sources`;
-    card.innerHTML = `<div class="top"><div><p class="kicker ${corroborated ? "multi" : "one"}">${typeIcon(ev.event_type)}${TYPE_LABEL[ev.event_type]} · ${sourcesLabel}</p><h2>${esc(ev.location_name)}</h2></div>${close}</div>
+    card.innerHTML = `<div class="top"><div><p class="kicker ${corroborated ? "multi" : "one"}">${typeIcons(ev)}${typeLabel(ev)}${ev.combined ? " (combined attack)" : ""} · ${sourcesLabel}</p><h2>${esc(ev.location_name)}</h2></div>${close}</div>
       <div class="body"><p class="muted">${esc(ev.country)}</p>${target}
       <p class="meta">${formatUtc(ev.last_updated)} · ${formatLocal(ev.last_updated)} <span class="muted">(when reported)</span></p>
       ${whyHtml(ev)}
@@ -830,8 +800,17 @@ const PRECISION_TEXT = { city: "city, ±10 km", region: "region, ±100 km", coun
 function whyHtml(ev) {
   const quote = (s) => `“${esc(s)}”`;
   const lines = [];
-  const typeR = ev.reports.find((r) => r.type === ev.event_type && r.why);
-  if (typeR) lines.push(`<li><b>${typeIcon(ev.event_type)}${TYPE_LABEL[ev.event_type]}</b> <span>because ${esc(typeR.source)} wrote ${quote(typeR.why.type)}</span></li>`);
+  // One line per kind: a combined attack explains each weapon.
+  for (const type of ev.combined ? ev.weapons : [ev.event_type]) {
+    const typeR = ev.reports.find((r) => r.type === type && r.why);
+    if (typeR) lines.push(`<li><b>${typeIcon(type)}${TYPE_LABEL[type]}</b> <span>because ${esc(typeR.source)} wrote ${quote(typeR.why.type)}</span></li>`);
+  }
+  if (ev.combined) lines.push(`<li class="once">Different weapons reported in the same city within 3 hours count as one combined attack.</li>`);
+  if (ev.when) {
+    const w = ev.when;
+    const r = ev.reports.find((x) => x.when && x.when.from === w.from);
+    lines.push(`<li><b>When</b> <span>${esc(w.label)} (estimated from ${esc(r ? r.source : "a headline")}'s wording: between ${formatUtc(w.from)} and ${formatUtc(w.to)}${new Date(w.from).toISOString().slice(0, 10) !== new Date(w.to).toISOString().slice(0, 10) ? ", across two days" : ""})</span></li>`);
+  }
   const placeR = ev.reports.find((r) => r.placeName === ev.location_name && r.why);
   if (placeR) {
     const words = placeR.why.cue === "'s" ? `${placeR.why.place}'s` : placeR.why.cue ? `${placeR.why.cue} ${placeR.why.place}` : placeR.why.place;
@@ -875,6 +854,7 @@ function renderKey() {
     <ul>${EVENT_TYPES.map((t) => item(typeIcon(t), TYPE_LABEL[t])).join("")}</ul>
     <h2>What was hit <span>(small badge, when the headline says)</span></h2>
     <ul>${Object.keys(TARGETS).map((t) => item(targetIcon(t), TARGETS[t].label)).join("")}</ul>
+    <p>A numbered bubble groups nearby events; click it to zoom in. Different weapons reported in the same city within 3 hours show as one combined attack ("Missile + drone"). "Happened overnight (estimated)" comes from wording like "overnight" or "yesterday"; otherwise the time is when it was reported. Headlines in Arabic, Russian and Ukrainian are read too.</p>
     <p>Not every marker is an attack. Fire is a blaze at a facility (refinery, depot, plant, port…), Wildfire is a forest, bush or grass fire, and Environmental is a spill, leak, dam breach or mine accident; explosions and fires may be accidents. Cities are markers; regions and countries also get a 100 or 300 km disc. Markers fade as reports age.</p>`;
 }
 

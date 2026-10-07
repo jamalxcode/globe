@@ -11,7 +11,7 @@ const read = (f) => readFileSync(path.join(root, f), "utf8");
 
 // Same scripts, same order as index.html, in one shared context (like <script> tags on a page).
 const context = vm.createContext({ console });
-for (const file of ["vendor/d3.min.js", "vendor/topojson.min.js", "provinces.js", "cities.js", "places.js", "extract.js", "tests/check.js"]) {
+for (const file of ["vendor/d3.min.js", "vendor/topojson.min.js", "provinces.js", "cities.js", "places.js", "names-i18n.js", "extract.js", "events.js", "tests/check.js"]) {
   vm.runInContext(read(file), context, { filename: file });
 }
 
@@ -19,11 +19,18 @@ const topo = JSON.parse(read("vendor/countries-50m.json"));
 const countries = context.topojson.feature(topo, topo.objects.countries).features;
 const extract = vm.runInContext("MeridianExtract", context);
 const matcher = extract.buildMatcher(countries);
-const suite = JSON.parse(read("tests/headlines.json"));
-const { passed, failed } = context.runChecks(extract, matcher, suite);
+const headlines = context.runChecks(extract, matcher, JSON.parse(read("tests/headlines.json")));
+const events = context.runEventChecks(vm.runInContext("MeridianEvents", context), JSON.parse(read("tests/events.json")));
 
-for (const f of failed) {
+// Every non-English place name must point at a known place.
+const missing = [...matcher.missingI18n];
+
+for (const f of [...headlines.failed, ...events.failed]) {
   console.log(`FAIL  ${f.why}\n      ${f.title}\n      expected ${JSON.stringify(f.expected)}\n      got      ${JSON.stringify(f.got)}`);
 }
-console.log(`${passed} passed, ${failed.length} failed`);
-process.exit(failed.length ? 1 : 0);
+if (missing.length) console.log(`FAIL  names-i18n.js names places that don't exist: ${missing.join(", ")}`);
+const failedCount = headlines.failed.length + events.failed.length + (missing.length ? 1 : 0);
+console.log(`headlines: ${headlines.passed} passed, ${headlines.failed.length} failed`);
+console.log(`events: ${events.passed} passed, ${events.failed.length} failed`);
+console.log(`${headlines.passed + events.passed} passed, ${failedCount} failed`);
+process.exit(failedCount ? 1 : 0);

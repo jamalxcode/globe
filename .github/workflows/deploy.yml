@@ -50,7 +50,7 @@ jobs:
       - name: Assemble site
         run: |
           mkdir _site
-          cp -r index.html style.css favicon.svg app.js extract.js places.js cities.js provinces.js vendor _site/
+          cp -r index.html style.css favicon.svg app.js extract.js events.js names-i18n.js places.js cities.js provinces.js vendor _site/
       - uses: actions/setup-node@v5
         if: env.FIRMS_MAP_KEY != ''
         with:

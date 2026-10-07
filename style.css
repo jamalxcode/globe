@@ -71,6 +71,15 @@ h2, p { margin: 0; }
 .dot .tglyph { fill: none; stroke: var(--bg); stroke-width: 2.8; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 .dot .hit { fill: transparent; cursor: pointer; }
 
+/* Groups of overlapping markers: same hollow/solid code as single markers, with the count inside. */
+.cluster .core { stroke-width: 2; vector-effect: non-scaling-stroke; }
+.cluster.one .core { fill: var(--bg); stroke: var(--one); }
+.cluster.multi .core { fill: var(--multi); stroke: var(--bg); }
+.cluster text { font-family: var(--mono); font-weight: 600; text-anchor: middle; pointer-events: none; }
+.cluster.one text { fill: var(--one); }
+.cluster.multi text { fill: var(--bg); }
+.cluster .hit { fill: transparent; cursor: zoom-in; }
+
 .burst { fill: none; stroke-width: 2; vector-effect: non-scaling-stroke; pointer-events: none; }
 .flash { pointer-events: none; }
 
@@ -215,6 +224,9 @@ h2, p { margin: 0; }
 .card .kicker.one { color: var(--one); }
 .card .kicker.multi { color: var(--multi); }
 .weak-note { font-size: 0.75rem; color: var(--muted); font-style: italic; }
+.when-note { font-size: 0.75rem; color: var(--sky); }
+/* Weak (unconfirmed) markers: dashed ring, so they read as "unconfirmed" even when faint. */
+.dot.weak .core { stroke-dasharray: 3 2; stroke-width: 2.5; }
 .row.off-map { opacity: 0.55; }
 .row.off-map:hover, .row.off-map.active { opacity: 0.85; }
 .why { margin-top: 0.75rem; padding: 0.625rem 0.75rem; border: 1px solid var(--line); border-radius: calc(var(--radius) - 0.25rem); background: var(--surface-2); }

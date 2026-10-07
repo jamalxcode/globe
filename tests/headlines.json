@@ -56,6 +56,19 @@
     { "why": "arms sale", "title": "US approves $832 million missile sale to Egypt", "category": "defense", "expect": null },
     { "why": "possible, not happened", "title": "Russia prepares key bridges for potential Ukrainian ballistic strikes", "category": "world", "expect": null },
     { "why": "airstrike in a Myanmar region", "title": "Airstrike in Sagaing kills 12", "category": "world", "expect": { "type": "airstrike", "place": "Sagaing" } },
-    { "why": "province without a city", "title": "Explosion at gas plant in Khuzestan", "category": "world", "expect": { "type": "explosion", "place": "Khuzestan" } }
+    { "why": "province without a city", "title": "Explosion at gas plant in Khuzestan", "category": "world", "expect": { "type": "explosion", "place": "Khuzestan" } },
+    { "why": "when: overnight", "title": "Overnight drone attack on Odesa port", "category": "world", "expect": { "type": "drone", "place": "Odesa", "target": "ship", "when": "overnight" } },
+    { "why": "when: yesterday", "title": "Missile struck Kharkiv yesterday, officials say", "category": "world", "expect": { "type": "missile", "place": "Kharkiv", "when": "yesterday" } },
+    { "why": "when: none means around the report", "title": "Drone strike hits refinery in Volgograd", "category": "world", "expect": { "type": "drone", "when": null } },
+    { "why": "Russian: missiles at Aden airport", "title": "Хуситы ударили баллистическими ракетами по аэропорту в йеменском Адене", "category": "world", "expect": { "type": "missile", "place": "Aden", "target": "airport" } },
+    { "why": "Russian: case ending (Киеве)", "title": "В Киеве прогремели взрывы, работает ПВО", "category": "world", "expect": { "type": "explosion", "place": "Kyiv" } },
+    { "why": "Russian: explainer is not an event", "title": "Снайперы и минометные обстрелы. Как дети в Йемене ходят в школу рядом с фронтом", "category": "world", "expect": null },
+    { "why": "Russian: overnight", "title": "Ночью беспилотники атаковали нефтебазу в Брянске", "category": "world", "expect": { "type": "drone", "place": "Bryansk", "target": "fuel", "when": "overnight" } },
+    { "why": "Ukrainian: missile strike on Kyiv", "title": "Ракетний удар по Києву: загинули дві людини", "category": "world", "expect": { "type": "missile", "place": "Kyiv" } },
+    { "why": "Ukrainian: drones on Odesa port", "title": "Дрони атакували порт в Одесі, виникла пожежа", "category": "world", "expect": { "type": "drone", "place": "Odesa", "target": "ship" } },
+    { "why": "Arabic: airstrike on Beirut", "title": "غارة إسرائيلية على الضاحية الجنوبية لبيروت", "category": "mideast", "expect": { "type": "airstrike" } },
+    { "why": "Arabic: attached prefix (بغزة)", "title": "مقتل خمسة بقصف مدفعي بغزة", "category": "mideast", "expect": { "type": "shelling", "place": "Gaza" } },
+    { "why": "Arabic: refinery fire", "title": "حريق ضخم في مصفاة بنغازي", "category": "world", "expect": { "type": "fire", "place": "Benghazi", "target": "fuel" } },
+    { "why": "Arabic: military exercise is not an event", "title": "مناورات عسكرية بالذخيرة الحية قرب دمشق", "category": "mideast", "expect": null }
   ]
 }
