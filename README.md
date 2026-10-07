@@ -34,6 +34,8 @@ The map uses the **Equal Earth** projection, which keeps every country at its tr
 4. **Merging.** Reports of compatible kinds within 50 km and 3 hours of each other become one event. Google News items count as the outlet named at the end of the headline.
 5. **Independent sources.** An event turns solid when **two or more independent sources** report it. Headlines count as one source when they come from the same outlet, credit the same wire story (Reuters, AP or AFP: "Source: Reuters", "according to AP", "Reuters reports"), are near-identical reprints (70% of their words shared), or come from outlets with the same owner (`OWNER_GROUPS` in [`app.js`](app.js): RT and Sputnik, Anadolu and TRT World, Al Jazeera's channels…).
 
+6. **Weak reports correct themselves.** An event with one source that is only social posts (and doesn't credit a wire agency), or that only names a whole country, is drawn faintly. If no second independent source confirms it within 6 hours (`WEAK_HOURS` in `app.js`), it leaves the map; it stays in the feed list, dimmed, with a note.
+
 Every info card has a **Why this is on the map** box: the words that set the type, the place (with how precise it is), the target, and how the headlines were counted ("3 headlines by 3 outlets → 2 independent sources", with what was counted once and why). The matched words are highlighted in each headline, so a wrong pin shows exactly what the rules misread.
 
 Every event gets a marker; regions and whole countries also get a disc of 100 km or 300 km. Markers fade as they age, and the **1h / 6h / 12h / 24h / 48h** buttons set how far back the map goes (48 hours is everything the feed keeps). Only reports are drawn on the map; the featured locations in the left panel are shortcuts and have no marker.
@@ -47,6 +49,10 @@ This is keyword matching, not reading comprehension, so expect some misses and t
 - **Reconnecting / Offline**: the feed couldn't be fetched; the page retries every minute.
 
 Hover over the pill for the feed's age and when Bluesky was last checked.
+
+## Tests and publishing
+
+[`tests/headlines.json`](tests/headlines.json) holds real and typical headlines with the right answer: what kind of event, where, what was hit, or "not an event". It includes every mistake that has been fixed (the old Kuwait story, "Russia says…", the Cardón refinery fire…), so they can't come back. On every push, [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) runs `node tests/run.mjs`; only if every case passes does it publish the site to GitHub Pages. If a case fails, the last good version stays live and GitHub emails the failure. When a rule is fixed, add its headline as a new case.
 
 ## Editing
 
@@ -70,7 +76,7 @@ Hover over the pill for the feed's age and when Bluesky was last checked.
 
 To regenerate `provinces.js`, download `ne_10m_admin_1_label_points_details.geojson` from [Natural Earth's repository](https://github.com/nvkelso/natural-earth-vector/tree/master/geojson) and run `powershell -File scripts\build-provinces.ps1 -Points <that file>`. The country list and the suffix-only names are at the top of the script.
 
-Libraries load from public CDNs: [d3](https://d3js.org) (map drawing), [topojson](https://github.com/topojson/topojson) and [world-atlas](https://github.com/topojson/world-atlas) (country shapes, from Natural Earth). Icons adapted from [Lucide](https://lucide.dev) (ISC license). City data © [GeoNames](https://www.geonames.org), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Province data from [Natural Earth](https://www.naturalearthdata.com) (public domain).
+Libraries are kept in [`vendor/`](vendor), so the map doesn't depend on a CDN: [d3](https://d3js.org) 7.9.0 (map drawing), [topojson](https://github.com/topojson/topojson) 3.0.2 and [world-atlas](https://github.com/topojson/world-atlas) 2.0.2 (country shapes, from Natural Earth). Only the fonts still come from Google Fonts; without them the page falls back to system fonts. Icons adapted from [Lucide](https://lucide.dev) (ISC license). City data © [GeoNames](https://www.geonames.org), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Province data from [Natural Earth](https://www.naturalearthdata.com) (public domain).
 
 ## Run locally
 

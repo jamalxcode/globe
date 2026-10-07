@@ -13,7 +13,8 @@ var MeridianExtract = (function () {
     ["drone", /\b(drones?|UAVs?|Shaheds?|Gerans?|loitering munitions?|kamikaze)\b/i],
     ["missile", /\b(missiles?|ballistic|Iskanders?|Kinzhals?|Kalibrs?|ATACMS|Storm Shadows?|HIMARS|rockets?|interceptors?|intercepted|interceptions?|projectiles?)\b/i],
     ["airstrike", /\b(air ?strikes?|air-strikes?|air ?raids?|warplanes?|fighter jets?|bombings?|bombed|bombard\w*|glide bombs?|guided bombs?)\b/i],
-    ["shelling", /\b(shelling|shelled|artillery|mortars?|MLRS|howitzers?)\b/i],
+    // "shells" only as plural/verb: "Shell" alone is usually the oil company.
+    ["shelling", /\b(shelling|shelled|shells|artillery|mortars?|MLRS|howitzers?)\b/i],
     ["explosion", /\b(explosions?|(a|the|massive|huge|large|powerful|deadly|mine|bomb|twin) blasts?|blasts? (in|at|near|rocks?|rocked|kills?|killed|heard|hits?)|exploded|detonat\w+|car bombs?|IEDs?|blew up|blown up|suicide bomb\w*)\b/i],
     // Incidents that hit a country's land, water or resources, accident or not.
     ["wildfire", /\b(wildfires?|wild ?land fires?|forest fires?|bush ?fires?|brush ?fires?|grass ?fires?|peat fires?|fires? (rages?|raging|spreads?|spreading) (through|across))\b/i],
@@ -27,7 +28,7 @@ var MeridianExtract = (function () {
   const FIRE_TARGETS = new Set(["fuel", "power", "industry", "military", "ship", "airport", "rail"]);
 
   // A weapon alone ("drone maker opens plant") isn't an event; the headline must also say something happened.
-  const ACTION = /\b(attack(s|ed|ing)?|launch(es|ed|ing)? (\w+ )?(at|on|against|toward|towards)|strikes?|struck|hit(s|ting)?|shot down|downed|intercept(s|ed|ion|ions)?|explosions?|blasts?|explod\w+|detonat\w+|kill(s|ed|ing)?|injur\w+|wound\w+|damag\w+|destroy\w+|fires?|burn(s|ing|ed)?|ablaze|blazes?|engulf\w*|flames|inferno|gutted|(breaks?|broke) out|sank|sinks?|sinking|sunk|target(s|ed|ing)|land(ed|s)? (in|on|near)|impacts?|shelling|shelled|air ?strikes?|air ?raids?|bombed|bombing|bombard\w*|casualt\w+|dead|died|victims?|pounded|hammered)\b/i;
+  const ACTION = /\b(attack(s|ed|ing)?|launch(es|ed|ing)? (\w+ )?(at|on|against|toward|towards)|strikes?|struck|hit(s|ting)?|shot down|downed|intercept(s|ed|ion|ions)?|explosions?|blasts?|explod\w+|detonat\w+|kill(s|ed|ing)?|injur\w+|wound\w+|damag\w+|destroy\w+|fires?|burn(s|ing|ed)?|ablaze|blazes?|engulf\w*|flames|inferno|gutted|(breaks?|broke) out|sank|sinks?|sinking|sunk|target(s|ed|ing)|land(ed|s)? (in|on|near)|impacts?|shelling|shelled|shells|air ?strikes?|air ?raids?|bombed|bombing|bombard\w*|casualt\w+|dead|died|victims?|pounded|hammered)\b/i;
 
   // Headlines that use strike words for something else, or talk about what might happen.
   const NEGATIVE = /\b(on strike|strike action|strikers|workers'? strike|general strike|hunger strike|labou?r strike|walkouts?|explosive (growth|rise|increase|claims?|allegations?|report|interview|testimony)|population explosion|lawsuits?|films?|movies?|documentary|anniversary|years ago|missile tests?|tests?|tested|test[- ]?fir\w*|test[- ]?launch\w*|test flights?|acceptance firing|successfully launch\w*|first release|drills?|military exercises?|contest|parade|contracts?|arms deals?|arms sales?|sale|approved|procure\w*|budget|aid package|unveil\w*|presented|develop\w*|manufactur\w*|delivery|deliveries|supply chain|subsidiary|partnership|SpaceX|NASA|Starship|spacecraft|satellite launch|open(ed)? fire|gunfire|fire brigades?|fire season|fire risk|potential|possible|could|might|would|threat of|fears?|plot|prepar\w+|plans? to|expected|may be|risk of|projected)\b/i;

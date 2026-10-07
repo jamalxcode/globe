@@ -7,12 +7,15 @@
 "use strict";
 
 const FEED_URL = "https://news.sala.company/feed.json";
-const ATLAS_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-50m.json";
+const ATLAS_URL = "vendor/countries-50m.json"; // world-atlas 2.0.2 (Natural Earth country shapes), kept in the repo
 const POLL_S = 60;
 const MERGE_KM = 50;
 const MERGE_MS = 3 * 3600e3;
 const MAX_EVENTS = 500;
 const STALE_MIN = 20; // feed older than this shows "Delayed"
+// A weak report (one source that is only social posts, or that only names a whole country) shows faintly,
+// and leaves the map if no second independent source backs it up within this many hours.
+const WEAK_HOURS = 6;
 // The feed keeps 48 hours, so that's the longest range.
 const WINDOWS = [
   { h: 1, label: "1h", long: "hour" },
@@ -285,6 +288,8 @@ function buildEvents(mentions) {
     ev.source_count = ev.groups.length; // independent sources
     ev.outlet_count = ev.sources.size;  // outlet names, before counting reprints and owners once
     ev.status = ev.source_count >= 2 ? "corroborated" : "unverified";
+    // A social post that credits a wire agency ("Source: Reuters") isn't a lone social claim.
+    ev.weak = ev.source_count === 1 && (ev.reports.every((r) => r.social && !r.wire) || ev.precision === "country");
     ev.reports.sort((a, b) => Date.parse(b.published) - Date.parse(a.published));
     // The target most of its headlines name; on a tie, the one the newest headline names.
     const votes = new Map();
@@ -406,7 +411,13 @@ function filtered() {
 
 function fadeFor(ev, now) {
   const age = now - ev.lastT;
-  return Math.max(0.3, 1 - age / (state.windowH * 3600e3));
+  const fade = Math.max(0.3, 1 - age / (state.windowH * 3600e3));
+  return ev.weak ? fade * 0.55 : fade;
+}
+
+// A weak event nothing else confirmed within WEAK_HOURS of its first report: kept in the list, off the map.
+function offMap(ev, now = Date.now()) {
+  return ev.weak && now - Date.parse(ev.first_seen) > WEAK_HOURS * 3600e3;
 }
 
 // ---------- map ----------
@@ -464,7 +475,7 @@ function layout() {
 
 function drawEvents() {
   const now = Date.now();
-  const list = filtered().slice().reverse(); // oldest first, so the newest draw on top
+  const list = filtered().filter((d) => !offMap(d, now)).reverse(); // oldest first, so the newest draw on top
   // "one" = a single source (hollow, dashed), "multi" = two or more (solid): told apart by shape, not only color.
   const tone = (d) => (d.status === "corroborated" ? "multi" : "one");
   const hot = (d) => (state.hover === d.id || (state.selection && state.selection.id === d.id) ? " hot" : "");
@@ -661,10 +672,12 @@ function renderFeed() {
       // The tag spells out the source count (hollow for one, solid for several), so color isn't needed.
       const tag = `<span class="tag ${tone}">${ev.source_count} ${ev.source_count === 1 ? "source" : "sources"}</span>`;
       const target = ev.target ? `<span class="target" title="${esc(TARGETS[ev.target].label)}">${targetIcon(ev.target)}${esc(TARGETS[ev.target].label)}</span>` : "";
-      return `<li><button type="button" class="row ${tone}${active ? " active" : ""}" data-row-kind="event" data-row-id="${ev.id}">
+      const hidden = offMap(ev, now);
+      const weakNote = hidden ? `<span class="weak-note">Not confirmed within ${WEAK_HOURS} h: off the map</span>` : ev.weak ? `<span class="weak-note">${weakReason(ev)}: shown faintly until a second source confirms</span>` : "";
+      return `<li><button type="button" class="row ${tone}${active ? " active" : ""}${hidden ? " off-map" : ""}" data-row-kind="event" data-row-id="${ev.id}">
         <span class="line"><span class="type">${typeIcon(ev.event_type)}${TYPE_LABEL[ev.event_type]}${target}</span><span class="time">${relativeTime(ev.last_updated, now)}</span></span>
         <span class="line"><span class="where">${esc(ev.location_name)}<span> · ${esc(ev.country)}</span></span>${tag}</span>
-        <span class="headline">${esc(ev.reports[0].title)}</span>
+        <span class="headline">${esc(ev.reports[0].title)}</span>${weakNote}
       </button></li>`;
     }).join("");
   }
@@ -754,6 +767,10 @@ function markTerms(title, terms) {
   return out + esc(title.slice(pos));
 }
 
+function weakReason(ev) {
+  return ev.reports.every((r) => r.social && !r.wire) ? "Single social-media source" : "Only a whole country is named";
+}
+
 const PRECISION_TEXT = { city: "city, ±10 km", region: "region, ±100 km", country: "whole country, ±300 km" };
 
 // "Why this is on the map": the words behind the type, place, target and source count.
@@ -778,6 +795,11 @@ function whyHtml(ev) {
     .filter((g) => g.reasons.size && new Set(g.reports.map((r) => r.source)).size > 1)
     .map((g) => `<li class="once">Counted once: ${esc([...new Set(g.reports.map((r) => r.source))].join(", "))} <span>(${esc([...g.reasons].join("; "))})</span></li>`);
   lines.push(`<li>${sources}</li>`, ...once);
+  if (ev.weak) {
+    lines.push(offMap(ev)
+      ? `<li class="once">${weakReason(ev)}, and no second source within ${WEAK_HOURS} hours, so it's off the map (still listed here).</li>`
+      : `<li class="once">${weakReason(ev)}, so it's shown faintly; it leaves the map if no second source confirms within ${WEAK_HOURS} hours.</li>`);
+  }
   return `<div class="why"><p class="why-title">Why this is on the map</p><ul>${lines.join("")}</ul></div>`;
 }
 
@@ -790,7 +812,7 @@ function renderKey() {
       ${item('<i class="swatch one"></i>', "Hollow ring: 1 source")}
       ${item('<i class="swatch multi"></i>', "Solid dot: 2+ independent sources")}
     </ul>
-    <p class="key-note">Reprints of one wire story, near-identical headlines and outlets with the same owner (RT and Sputnik, for example) count as one source.</p>
+    <p class="key-note">Reprints of one wire story, near-identical headlines and outlets with the same owner (RT and Sputnik, for example) count as one source. A report from a single social-media source, or naming only a whole country, is shown faintly and leaves the map if nothing confirms it within ${WEAK_HOURS} hours (it stays in the feed list).</p>
     <h2>What happened</h2>
     <ul>${EVENT_TYPES.map((t) => item(typeIcon(t), TYPE_LABEL[t])).join("")}</ul>
     <h2>What was hit <span>(small badge, when the headline says)</span></h2>

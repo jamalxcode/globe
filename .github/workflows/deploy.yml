@@ -1,0 +1,50 @@
+# On every push: check the headline rules against tests/headlines.json, then publish to GitHub Pages.
+# If a check fails, nothing is published: the last good version stays live and GitHub emails the failure.
+name: Test and deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# A newer push replaces a deploy that is still waiting.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Check headline rules
+        run: node tests/run.mjs
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+      # Only the files the page needs; tests and scripts stay in the repo.
+      - name: Assemble site
+        run: |
+          mkdir _site
+          cp -r index.html style.css favicon.svg app.js extract.js places.js cities.js provinces.js vendor _site/
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
