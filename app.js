@@ -16,6 +16,14 @@ const STALE_MIN = 20; // feed older than this shows "Delayed"
 // A weak report (one source that is only social posts, or that only names a whole country) shows faintly,
 // and leaves the map if no second independent source backs it up within this many hours.
 const WEAK_HOURS = 6;
+// Satellite heat (fires.json, NASA FIRMS, refreshed hourly by the deploy workflow): a detection this close to a
+// city event, from SAT_BEFORE_H before its first report to SAT_AFTER_H after its last, is noted on the event.
+const FIRES_URL = "fires.json";
+const SAT_KM = 10;
+const SAT_BEFORE_H = 12;
+const SAT_AFTER_H = 24;
+// Kinds of event where heat is expected; a shelling or missile hit on a city block often shows, a spill doesn't.
+const SAT_TYPES = new Set(["airstrike", "missile", "explosion", "shelling", "drone", "fire", "wildfire", "other"]);
 // The feed keeps 48 hours, so that's the longest range.
 const WINDOWS = [
   { h: 1, label: "1h", long: "hour" },
@@ -59,6 +67,8 @@ const TYPE_ICONS = {
   drone: "M9 9 6.5 6.5M15 9l2.5-2.5M9 15l-2.5 2.5M15 15l2.5 2.5M9 9h6v6H9zM8 5a3 3 0 1 1-6 0 3 3 0 1 1 6 0zM22 5a3 3 0 1 1-6 0 3 3 0 1 1 6 0zM8 19a3 3 0 1 1-6 0 3 3 0 1 1 6 0zM22 19a3 3 0 1 1-6 0 3 3 0 1 1 6 0z",
   other: "M21.73 18l-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3zM12 9v4M12 17h.01",
 };
+
+const SATELLITE_ICON = "M13 7 9 3 5 7l4 4M17 11l4 4-4 4-4-4M8 12l4 4 6-6-4-4ZM16 8l3-3M9 21a6 6 0 0 0-6-6";
 
 function svgIcon(d, cls = "ticon") {
   return d ? `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>` : "";
@@ -179,6 +189,46 @@ function independentGroups(reports) {
   return [...groups.values()];
 }
 
+// ---------- satellite heat ----------
+
+let fires = null; // { generated_at, points: [[lat, lng, minutes, frp]], grid: Map("lat,lng" -> points) }
+
+async function loadFires() {
+  try {
+    const res = await fetch(`${FIRES_URL}?t=${Date.now()}`, { cache: "no-store" });
+    if (!res.ok) return false;
+    const data = await res.json();
+    const grid = new Map();
+    for (const p of data.points || []) {
+      const key = `${Math.floor(p[0])},${Math.floor(p[1])}`;
+      if (!grid.has(key)) grid.set(key, []);
+      grid.get(key).push(p);
+    }
+    fires = { generated_at: data.generated_at, grid };
+    return true;
+  } catch {
+    return false; // no file yet (no key), or offline: no satellite notes
+  }
+}
+
+// The nearest detection within SAT_KM of a city event, in its time window: { km, time, frp } or null.
+function satelliteHeat(ev) {
+  if (!fires || ev.precision !== "city" || !SAT_TYPES.has(ev.event_type)) return null;
+  const from = (Date.parse(ev.first_seen) - SAT_BEFORE_H * 3600e3) / 60000;
+  const to = (ev.lastT + SAT_AFTER_H * 3600e3) / 60000;
+  let best = null;
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      for (const [lat, lng, minutes, frp] of fires.grid.get(`${Math.floor(ev.lat) + dy},${Math.floor(ev.lng) + dx}`) || []) {
+        if (minutes < from || minutes > to) continue;
+        const d = haversineKm(ev.lat, ev.lng, lat, lng);
+        if (d <= SAT_KM && (!best || d < best.km)) best = { km: d, time: new Date(minutes * 60000).toISOString(), frp };
+      }
+    }
+  }
+  return best;
+}
+
 // Explosions, fires and "other" can be part of any attack; two specific kinds (drone vs shelling) stay apart.
 function typesCompatible(a, b) {
   return a === b || TYPE_RANK[a] < 3 || TYPE_RANK[b] < 3;
@@ -288,8 +338,10 @@ function buildEvents(mentions) {
     ev.source_count = ev.groups.length; // independent sources
     ev.outlet_count = ev.sources.size;  // outlet names, before counting reprints and owners once
     ev.status = ev.source_count >= 2 ? "corroborated" : "unverified";
-    // A social post that credits a wire agency ("Source: Reuters") isn't a lone social claim.
-    ev.weak = ev.source_count === 1 && (ev.reports.every((r) => r.social && !r.wire) || ev.precision === "country");
+    ev.satellite = satelliteHeat(ev);
+    // A social post that credits a wire agency ("Source: Reuters") isn't a lone social claim, and satellite heat
+    // near the place is independent evidence.
+    ev.weak = !ev.satellite && ev.source_count === 1 && (ev.reports.every((r) => r.social && !r.wire) || ev.precision === "country");
     ev.reports.sort((a, b) => Date.parse(b.published) - Date.parse(a.published));
     // The target most of its headlines name; on a tie, the one the newest headline names.
     const votes = new Map();
@@ -670,7 +722,8 @@ function renderFeed() {
       const tone = ev.status === "corroborated" ? "multi" : "one";
       const active = state.hover === ev.id || (state.selection && state.selection.id === ev.id);
       // The tag spells out the source count (hollow for one, solid for several), so color isn't needed.
-      const tag = `<span class="tag ${tone}">${ev.source_count} ${ev.source_count === 1 ? "source" : "sources"}</span>`;
+      const sat = ev.satellite ? `<span class="tag sat" title="Satellite heat detected ${ev.satellite.km.toFixed(1)} km away (NASA FIRMS)">${svgIcon(SATELLITE_ICON)}heat</span>` : "";
+      const tag = `${sat}<span class="tag ${tone}">${ev.source_count} ${ev.source_count === 1 ? "source" : "sources"}</span>`;
       const target = ev.target ? `<span class="target" title="${esc(TARGETS[ev.target].label)}">${targetIcon(ev.target)}${esc(TARGETS[ev.target].label)}</span>` : "";
       const hidden = offMap(ev, now);
       const weakNote = hidden ? `<span class="weak-note">Not confirmed within ${WEAK_HOURS} h: off the map</span>` : ev.weak ? `<span class="weak-note">${weakReason(ev)}: shown faintly until a second source confirms</span>` : "";
@@ -795,6 +848,10 @@ function whyHtml(ev) {
     .filter((g) => g.reasons.size && new Set(g.reports.map((r) => r.source)).size > 1)
     .map((g) => `<li class="once">Counted once: ${esc([...new Set(g.reports.map((r) => r.source))].join(", "))} <span>(${esc([...g.reasons].join("; "))})</span></li>`);
   lines.push(`<li>${sources}</li>`, ...once);
+  if (ev.satellite) {
+    const s = ev.satellite;
+    lines.push(`<li><b>${svgIcon(SATELLITE_ICON)}Satellite heat</b> <span>detected ${s.km.toFixed(1)} km away at ${formatUtc(s.time)} (NASA FIRMS). It may be unrelated: industry and farm fires show up too.</span></li>`);
+  }
   if (ev.weak) {
     lines.push(offMap(ev)
       ? `<li class="once">${weakReason(ev)}, and no second source within ${WEAK_HOURS} hours, so it's off the map (still listed here).</li>`
@@ -813,6 +870,7 @@ function renderKey() {
       ${item('<i class="swatch multi"></i>', "Solid dot: 2+ independent sources")}
     </ul>
     <p class="key-note">Reprints of one wire story, near-identical headlines and outlets with the same owner (RT and Sputnik, for example) count as one source. A report from a single social-media source, or naming only a whole country, is shown faintly and leaves the map if nothing confirms it within ${WEAK_HOURS} hours (it stays in the feed list).</p>
+    <p class="key-note">${svgIcon(SATELLITE_ICON)} <b>heat</b>: a NASA satellite detected heat within ${SAT_KM} km around the time of the report. Supporting evidence, not proof: industry and farm fires show up too.</p>
     <h2>What happened</h2>
     <ul>${EVENT_TYPES.map((t) => item(typeIcon(t), TYPE_LABEL[t])).join("")}</ul>
     <h2>What was hit <span>(small badge, when the headline says)</span></h2>
@@ -916,8 +974,10 @@ async function start() {
   } catch {
     document.getElementById("status").title = "The world map didn't load. Reload the page to try again.";
   }
-  await feed;
+  await Promise.all([feed, loadFires()]);
   rebuild();
+  // Satellite data changes hourly at most.
+  setInterval(() => loadFires().then((ok) => { if (ok) rebuild(false); }), 30 * 60 * 1000);
   pollLive();
   setInterval(loadFeed, POLL_S * 1000);
   setInterval(pollLive, POLL_S * 1000);

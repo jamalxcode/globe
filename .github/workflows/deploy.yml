@@ -1,10 +1,15 @@
-# On every push: check the headline rules against tests/headlines.json, then publish to GitHub Pages.
+# On every push, and hourly: check the headline rules against tests/headlines.json, then publish to GitHub
+# Pages, with fresh satellite heat data (fires.json) when the FIRMS_MAP_KEY secret is set.
 # If a check fails, nothing is published: the last good version stays live and GitHub emails the failure.
 name: Test and deploy
 
 on:
   push:
     branches: [main]
+  # Hourly refresh of the satellite data (NASA updates it every few hours). GitHub's schedule can run late;
+  # that's fine here.
+  schedule:
+    - cron: "23 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -36,6 +41,9 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    # Empty until the FIRMS_MAP_KEY repository secret is added; the satellite steps are then skipped.
+    env:
+      FIRMS_MAP_KEY: ${{ secrets.FIRMS_MAP_KEY }}
     steps:
       - uses: actions/checkout@v5
       # Only the files the page needs; tests and scripts stay in the repo.
@@ -43,6 +51,15 @@ jobs:
         run: |
           mkdir _site
           cp -r index.html style.css favicon.svg app.js extract.js places.js cities.js provinces.js vendor _site/
+      - uses: actions/setup-node@v5
+        if: env.FIRMS_MAP_KEY != ''
+        with:
+          node-version: 22
+      # Satellite heat near known cities. A failed download publishes the site without fires.json rather
+      # than failing the deploy.
+      - name: Satellite heat (NASA FIRMS)
+        if: env.FIRMS_MAP_KEY != ''
+        run: node scripts/fires.mjs > _site/fires.json || rm -f _site/fires.json
       - uses: actions/upload-pages-artifact@v4
         with:
           path: _site

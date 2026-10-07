@@ -36,6 +36,8 @@ The map uses the **Equal Earth** projection, which keeps every country at its tr
 
 6. **Weak reports correct themselves.** An event with one source that is only social posts (and doesn't credit a wire agency), or that only names a whole country, is drawn faintly. If no second independent source confirms it within 6 hours (`WEAK_HOURS` in `app.js`), it leaves the map; it stays in the feed list, dimmed, with a note.
 
+7. **Satellite heat.** Every hour the deploy workflow downloads NASA FIRMS detections (VIIRS on S-NPP and NOAA-20, last 48 hours) near known cities into `fires.json` ([`scripts/fires.mjs`](scripts/fires.mjs)). A city event with a detection within 10 km, from 12 hours before its first report to 24 hours after its last, gets a **heat** tag and a line in its card, and is never treated as weak. It's supporting evidence, not proof: industry, gas flares and farm fires show up too. This needs a free NASA key stored as the repository secret `FIRMS_MAP_KEY`; without it the map works the same, with no satellite notes.
+
 Every info card has a **Why this is on the map** box: the words that set the type, the place (with how precise it is), the target, and how the headlines were counted ("3 headlines by 3 outlets → 2 independent sources", with what was counted once and why). The matched words are highlighted in each headline, so a wrong pin shows exactly what the rules misread.
 
 Every event gets a marker; regions and whole countries also get a disc of 100 km or 300 km. Markers fade as they age, and the **1h / 6h / 12h / 24h / 48h** buttons set how far back the map goes (48 hours is everything the feed keeps). Only reports are drawn on the map; the featured locations in the left panel are shortcuts and have no marker.
@@ -53,6 +55,13 @@ Hover over the pill for the feed's age and when Bluesky was last checked.
 ## Tests and publishing
 
 [`tests/headlines.json`](tests/headlines.json) holds real and typical headlines with the right answer: what kind of event, where, what was hit, or "not an event". It includes every mistake that has been fixed (the old Kuwait story, "Russia says…", the Cardón refinery fire…), so they can't come back. On every push, [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) runs `node tests/run.mjs`; only if every case passes does it publish the site to GitHub Pages. If a case fails, the last good version stays live and GitHub emails the failure. When a rule is fixed, add its headline as a new case.
+
+### Satellite key
+
+1. Request a free key at https://firms.modaps.eosdis.nasa.gov/api/map_key/ (email only; it arrives by email).
+2. Add it to this repository: **Settings → Secrets and variables → Actions → New repository secret**, name `FIRMS_MAP_KEY`. Or run `gh secret set FIRMS_MAP_KEY -R jamalxcode/globe` and paste the key when asked.
+
+The next hourly run (or **Actions → Test and deploy → Run workflow**) publishes `fires.json`. GitHub pauses scheduled workflows in a repository with no commits for 60 days; if that happens, the satellite data stops refreshing until the next push or a manual run.
 
 ## Editing
 
