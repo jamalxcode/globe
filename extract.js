@@ -109,7 +109,24 @@ var MeridianExtract = (function () {
         entries.set(name, { display, country: display, lat, lng, precision: "country" });
       }
     }
-    // Capitals and large cities first, so the hand-picked places in places.js win any shared name.
+    // Provinces (provinces.js): every name also goes in `regions`, used when the headline adds "region",
+    // "Oblast", "Province"... A "~" name counts only with such a suffix. A province never replaces a country.
+    const regions = new Map();
+    for (const raw of (typeof PROVINCE_LINES === "string" ? PROVINCE_LINES : "").split("\n")) {
+      const line = raw.trim();
+      if (!line) continue;
+      const [names, country, lat, lng] = line.split("|");
+      const list = names.split(";").map((n) => n.trim()).filter(Boolean);
+      const entry = { display: list[0].replace(/^~/, ""), country, lat: Number(lat), lng: Number(lng), precision: "region" };
+      for (const n of list) {
+        const name = n.replace(/^~/, "");
+        regions.set(name, entry);
+        const existing = entries.get(name);
+        if (existing && existing.precision === "country") continue;
+        entries.set(name, n.startsWith("~") ? { ...entry, suffixOnly: true } : entry);
+      }
+    }
+    // Capitals and large cities next, so the hand-picked places in places.js win any shared name.
     const lines = (typeof CITY_LINES === "string" ? CITY_LINES : "") + "\n" + PLACE_LINES;
     for (const raw of lines.split("\n")) {
       const line = raw.trim();
@@ -123,12 +140,14 @@ var MeridianExtract = (function () {
       .sort((a, b) => b.length - a.length)
       .map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
       .join("|");
-    return { regex: new RegExp(`(?<![\\p{L}\\p{N}])(${alternation})(?![\\p{L}\\p{N}])`, "gu"), entries };
+    return { regex: new RegExp(`(?<![\\p{L}\\p{N}])(${alternation})(?![\\p{L}\\p{N}])`, "gu"), entries, regions };
   }
 
   // A place followed by one of these is the speaker ("Russia says", "Moscow warns"), not where it happened.
   // Also "Russia's army says": a possessive and one word, then the verb.
   const SPEAKER = /^(['’]s\s+\w+)?\s+(says?|said|claims?|claimed|accuses?|accused|warns?|warned|denies|denied|vows?|vowed|threatens?|threatened|condemns?|condemned|blames?|blamed|responds?|responded|announces?|announced|confirms?|confirmed|reports?|reported|insists?|urges?|urged|demands?|retaliates?|launch(es|ed)?|fired)\b/i;
+  // Words after a name that make it the province rather than the city: "Kursk region", "Fars province".
+  const REGION_SUFFIX = /^\s+(oblast|region|province|governorate|state|krai|district|prefecture|territory)\b/i;
   // Words that can sit between a cue and the place: "over southwestern Saudi Arabia", "in the occupied West Bank".
   const BETWEEN = /\s+(the|northern|southern|eastern|western|north-?eastern|north-?western|south-?eastern|south-?western|central|occupied|coastal|far)\s*$/;
 
@@ -139,10 +158,17 @@ var MeridianExtract = (function () {
     if (!text || !matcher) return null;
     let best = null;
     for (const m of text.matchAll(matcher.regex)) {
-      const entry = matcher.entries.get(m[1]);
+      let entry = matcher.entries.get(m[1]);
       if (!entry) continue;
       const after = text.slice(m.index + m[1].length, m.index + m[1].length + 30);
       if (SPEAKER.test(after)) continue;
+      // "Kursk region", "Kharkiv Oblast", "Rivers State": the province, even where the name is also a city.
+      const suffix = after.match(REGION_SUFFIX);
+      let term = m[1];
+      if (suffix && matcher.regions && matcher.regions.has(m[1])) {
+        entry = matcher.regions.get(m[1]);
+        term = m[1] + suffix[0];
+      } else if (entry.suffixOnly) continue;
       const prevChar = text[m.index - 1];
       const nextChar = after[0];
       if (entry.precision === "country" && (prevChar === "-" || nextChar === "-")) continue; // "Russia-Ukraine"
@@ -153,7 +179,7 @@ var MeridianExtract = (function () {
       const possessive = /^['’]s\b/.test(after);
       if (entry.precision === "country" && !cued && !possessive) continue;
       const score = RANK[entry.precision] * 10 + (cued ? 4 : 0) - m.index / 10000;
-      if (!best || score > best.score) best = { ...entry, score, term: m[1], cue: cued ? before[1] : possessive ? "'s" : null };
+      if (!best || score > best.score) best = { ...entry, score, term, cue: cued ? before[1] : possessive ? "'s" : null };
     }
     return best;
   }

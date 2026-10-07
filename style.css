@@ -163,6 +163,17 @@ h2, p { margin: 0; }
 .legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.25rem 1rem; color: var(--fg); }
 .legend > span:last-child { color: var(--muted); }
 
+/* Beta notice, top left: small but readable. */
+.beta-note {
+  position: fixed; top: 4.25rem; left: 0.75rem; right: 0.75rem; z-index: 26;
+  font-size: 0.6875rem; line-height: 1.35; color: #b4bfcc; text-align: center;
+  pointer-events: none; text-shadow: 0 1px 2px var(--bg);
+}
+.beta-note b { color: var(--one); font-weight: 600; letter-spacing: 0.02em; }
+@media (min-width: 768px) {
+  .beta-note { top: 0.75rem; left: 2.25rem; right: auto; max-width: 15rem; text-align: left; }
+}
+
 /* Key popover */
 .key-pop {
   position: absolute; top: 3.5rem; left: 50%; transform: translateX(-50%); z-index: 31;

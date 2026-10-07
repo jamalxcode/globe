@@ -2,6 +2,8 @@
 
 A live world map of reported strikes, explosions, industrial fires, wildfires and environmental incidents. A hollow orange ring marks a report from one source; a solid pink dot marks two or more independent sources. Reports are news headlines and social posts, not confirmed facts.
 
+**Beta, for testing only:** events are matched automatically from real news headlines and may be wrong, incomplete or out of date. The page says so at the top left.
+
 It's a static page: no server, build step, API keys or sign-up. GitHub Pages serves the files and everything else happens in the visitor's browser.
 
 ```
@@ -28,7 +30,7 @@ The map uses the **Equal Earth** projection, which keeps every country at its tr
 
 1. **Sources.** The page reads [news.sala.company](https://news.sala.company)'s `feed.json`, the same collection of ~120 public news sites, Telegram channels and Bluesky accounts, and polls the feed's Bluesky accounts directly every minute. Tech, business and science stories are skipped.
 2. **Kind of event.** The headline must name a kind of strike (drone, missile, airstrike, shelling, explosion, or a bare "strike" / "attack" from conflict-focused sources) *and* say something happened (hit, killed, intercepted, shot down…). Headlines about tests, arms deals, drone makers or what *might* happen are dropped. So are stories that look back at an older attack, since their publish time is new but the event isn't: wording like "were warned… Then a drone hit", "months ago", "investigation", "how the…", or a month other than the current one ("in March"). The word lists are at the top of [`extract.js`](extract.js).
-3. **Place.** The headline is matched against about 2,700 place names: every country on the map, every capital plus each country's 10 largest other cities ([`cities.js`](cities.js), from GeoNames), and ~400 hand-picked conflict-zone towns and regions ([`places.js`](places.js)). The most specific place wins (a city beats a region beats a country), preferring a place right after words like "in", "on" or "hits".
+3. **Place.** The headline is matched against about 4,500 place names: every country on the map, every capital plus each country's 10 largest other cities ([`cities.js`](cities.js), from GeoNames), the provinces of 21 countries common in conflict and disaster news ([`provinces.js`](provinces.js), from Natural Earth: Ukraine, Russia, Iran, Iraq, Syria, Yemen, Sudan, Israel, Palestine, Lebanon, Nigeria, Ethiopia, Somalia, DR Congo, Pakistan, India, Myanmar, Turkey, Mexico, Brazil, China), and ~500 hand-picked towns and regions ([`places.js`](places.js)). The most specific place wins (a city beats a region beats a country), preferring a place right after words like "in", "on" or "hits". "Kursk region", "Zaporizhzhia Oblast" or "Rivers State" pick the province even when the name is also a city; province names that are common words ("Rivers", "Delta", "Fars") only count with such a suffix. A place that is the speaker ("Russia says", "Moscow warns") isn't used, and a whole country needs a cue ("in Russia", "Russia's").
 4. **Merging.** Reports of compatible kinds within 50 km and 3 hours of each other become one event. Google News items count as the outlet named at the end of the headline.
 5. **Independent sources.** An event turns solid when **two or more independent sources** report it. Headlines count as one source when they come from the same outlet, credit the same wire story (Reuters, AP or AFP: "Source: Reuters", "according to AP", "Reuters reports"), are near-identical reprints (70% of their words shared), or come from outlets with the same owner (`OWNER_GROUPS` in [`app.js`](app.js): RT and Sputnik, Anadolu and TRT World, Al Jazeera's channels…).
 
@@ -63,9 +65,12 @@ Hover over the pill for the feed's age and when Bluesky was last checked.
 | `extract.js` | The rules that turn a headline into a report: kind of strike, place, source |
 | `places.js` | Hand-picked places, country aliases and featured locations |
 | `cities.js` | Every capital plus each country's 10 largest other cities (generated) |
-| `scripts/` | The generator for `cities.js` and its skip list |
+| `provinces.js` | Provinces of 21 countries (generated) |
+| `scripts/` | The generators for `cities.js` and `provinces.js`, and the city skip list |
 
-Libraries load from public CDNs: [d3](https://d3js.org) (map drawing), [topojson](https://github.com/topojson/topojson) and [world-atlas](https://github.com/topojson/world-atlas) (country shapes, from Natural Earth). Icons adapted from [Lucide](https://lucide.dev) (ISC license). City data © [GeoNames](https://www.geonames.org), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+To regenerate `provinces.js`, download `ne_10m_admin_1_label_points_details.geojson` from [Natural Earth's repository](https://github.com/nvkelso/natural-earth-vector/tree/master/geojson) and run `powershell -File scripts\build-provinces.ps1 -Points <that file>`. The country list and the suffix-only names are at the top of the script.
+
+Libraries load from public CDNs: [d3](https://d3js.org) (map drawing), [topojson](https://github.com/topojson/topojson) and [world-atlas](https://github.com/topojson/world-atlas) (country shapes, from Natural Earth). Icons adapted from [Lucide](https://lucide.dev) (ISC license). City data © [GeoNames](https://www.geonames.org), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Province data from [Natural Earth](https://www.naturalearthdata.com) (public domain).
 
 ## Run locally
 
