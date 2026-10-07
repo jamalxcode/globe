@@ -153,7 +153,7 @@ var MeridianExtract = (function () {
       const possessive = /^['’]s\b/.test(after);
       if (entry.precision === "country" && !cued && !possessive) continue;
       const score = RANK[entry.precision] * 10 + (cued ? 4 : 0) - m.index / 10000;
-      if (!best || score > best.score) best = { ...entry, score, term: m[1] };
+      if (!best || score > best.score) best = { ...entry, score, term: m[1], cue: cued ? before[1] : possessive ? "'s" : null };
     }
     return best;
   }
@@ -174,10 +174,30 @@ var MeridianExtract = (function () {
     return null;
   }
 
-  function detectTarget(text) {
+  // { key, term }: the target and the words that named it.
+  function matchTarget(text) {
     if (!text) return null;
-    for (const [target, re] of TARGET_RULES) if (re.test(text)) return target;
+    for (const [key, re] of TARGET_RULES) {
+      const m = text.match(re);
+      if (m) return { key, term: m[0] };
+    }
     return null;
+  }
+
+  function detectTarget(text) {
+    const hit = matchTarget(text);
+    return hit ? hit.key : null;
+  }
+
+  // A wire agency the item credits ("Source: Reuters", "according to AP", "Reuters reports"), so reprints of
+  // one wire story count as one source. Case-sensitive: "AP" must be the agency, not a word.
+  const WIRE = /(?:[Aa]ccording to|[Cc]iting|[Cc]ites|[Vv]ia|[Ss]ource:|[Ss]ources:|\(|\s[-–—])\s*(Reuters|AP|Associated Press|AFP|Agence France-Presse)\b|\b(Reuters|AP|Associated Press|AFP)\s+(?:reports?|reported|says|said|news agency)\b/;
+
+  function wireOf(text) {
+    const m = text && text.match(WIRE);
+    if (!m) return null;
+    const name = m[1] || m[2];
+    return name === "Associated Press" ? "AP" : name === "Agence France-Presse" ? "AFP" : name;
   }
 
   // About 100 m: plenty for a map pin.
@@ -204,8 +224,8 @@ var MeridianExtract = (function () {
     const item = normalize(raw);
     if (RETRO.test(item.title) || namesOtherMonth(item.title, t)) return null;
     // Headline only: summaries mention too much else (a surgery story is not a hospital strike).
-    let target = detectTarget(item.title);
-    const kind = classify(item.title, item.category, target);
+    let hit = matchTarget(item.title);
+    const kind = classify(item.title, item.category, hit && hit.key);
     if (!kind) return null;
     // Telegram summaries often carry ads, so only news summaries help find the place, and only when they
     // name a city or region: a country in a summary is often a ship's flag or a side note.
@@ -218,9 +238,13 @@ var MeridianExtract = (function () {
     }
     if (!place) return null;
     // Leave out place names that start with "Port" (Port Sudan, Port Said) so they don't read as a port.
-    if (/^Port\b/.test(place.term)) target = detectTarget(item.title.replace(place.term, ""));
+    if (/^Port\b/.test(place.term)) hit = matchTarget(item.title.replace(place.term, ""));
     return {
-      target,
+      target: hit ? hit.key : null,
+      // The words behind each decision, shown in the info card ("Why this is on the map").
+      why: { type: kind.term, place: place.term, cue: place.cue, target: hit ? hit.term : null },
+      // Wire agency the item credits, if any; the source itself when it is one.
+      wire: wireOf(`${item.title} ${item.summary || ""}`),
       id: item.id,
       published: new Date(t).toISOString(),
       title: item.title,
@@ -232,5 +256,5 @@ var MeridianExtract = (function () {
     };
   }
 
-  return { RANK, RADIUS_KM, buildMatcher, locate, classify, detectTarget, toMention };
+  return { RANK, RADIUS_KM, buildMatcher, locate, classify, detectTarget, wireOf, toMention };
 })();

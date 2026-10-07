@@ -3,7 +3,7 @@
 // on GitHub, keeps 48 hours) plus the feed's Bluesky accounts, polled live.
 // extract.js turns each headline that names a kind of strike and a known place into a mention; mentions
 // of the same kind within 50 km and 3 hours merge into one event.
-// Amber = one source. Red = two or more independent sources.
+// Hollow ring = one source. Solid dot = two or more independent sources (see independentGroups).
 "use strict";
 
 const FEED_URL = "https://news.sala.company/feed.json";
@@ -105,6 +105,77 @@ function haversineKm(lat1, lng1, lat2, lng2) {
   return 2 * 6371 * Math.asin(Math.min(1, Math.sqrt(a)));
 }
 
+// ---------- independent sources ----------
+
+// Outlets with the same owner count as one source. Names as the feed (or Google News) spells them.
+const OWNER_GROUPS = {
+  "Russian state media": ["RT", "Sputnik", "TASS", "RIA Novosti"],
+  "Turkish state media": ["Anadolu", "Anadolu Agency", "TRT World"],
+  "Ukrainian state media": ["Ukrinform"],
+  "Chinese state media": ["CGTN", "Xinhua", "Global Times", "China Daily"],
+  "Iranian state media": ["Press TV", "IRNA", "Tasnim", "Fars"],
+  "Al Jazeera": ["Al Jazeera", "Al Jazeera English"],
+  BBC: ["BBC", "BBC News", "BBC Middle East"],
+  DW: ["DW", "DW News"],
+  AP: ["AP", "AP News", "Associated Press", "The Associated Press"],
+};
+const OWNER_OF = new Map(Object.entries(OWNER_GROUPS).flatMap(([group, names]) => names.map((n) => [n.toLowerCase(), group])));
+
+function ownerOf(source) {
+  return OWNER_OF.get(source.toLowerCase()) || source;
+}
+
+const SIMILAR_SKIP = new Set("the and for from with after over says said into amid near this that their its are was were has have had new".split(" "));
+
+function keywords(title) {
+  return new Set(title.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length > 2 && !SIMILAR_SKIP.has(w)));
+}
+
+// Near-identical headlines (a reprint, maybe lightly edited): at least 4 shared words, and 70% of all the words
+// in both are shared. Two newsrooms describing the same facts in their own words stay separate.
+function nearIdentical(a, b) {
+  let shared = 0;
+  for (const w of a) if (b.has(w)) shared++;
+  return shared >= 4 && shared / (a.size + b.size - shared) >= 0.7;
+}
+
+// Splits an event's reports into independent sources. Reports join one source when they credit the same wire
+// agency (or are it), come from outlets with the same owner, or have near-identical headlines (reprints).
+// Returns [{ name, reasons: Set, reports }].
+function independentGroups(reports) {
+  const parent = reports.map((_, i) => i);
+  const reasons = reports.map(() => new Set());
+  const find = (i) => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+  const join = (a, b, reason) => {
+    a = find(a);
+    b = find(b);
+    if (a !== b) { parent[b] = a; for (const r of reasons[b]) reasons[a].add(r); }
+    if (reason) reasons[a].add(reason);
+  };
+  const firstByKey = new Map();
+  reports.forEach((r, i) => {
+    const key = r.wire || ownerOf(r.source);
+    if (!firstByKey.has(key)) { firstByKey.set(key, i); return; }
+    const other = reports[firstByKey.get(key)];
+    if (other.source === r.source && !r.wire) join(firstByKey.get(key), i, null); // same outlet twice
+    else if (r.wire || key === r.source) join(firstByKey.get(key), i, `same ${key} story`); // credits the wire, or is it
+    else join(firstByKey.get(key), i, `same owner: ${key}`);
+  });
+  const words = reports.map((r) => keywords(r.title));
+  for (let i = 0; i < reports.length; i++) {
+    for (let j = i + 1; j < reports.length; j++) {
+      if (find(i) !== find(j) && nearIdentical(words[i], words[j])) join(i, j, "near-identical headlines");
+    }
+  }
+  const groups = new Map();
+  reports.forEach((r, i) => {
+    const root = find(i);
+    if (!groups.has(root)) groups.set(root, { name: r.wire || ownerOf(r.source), reasons: reasons[root], reports: [] });
+    groups.get(root).reports.push(r);
+  });
+  return [...groups.values()];
+}
+
 // Explosions, fires and "other" can be part of any attack; two specific kinds (drone vs shelling) stay apart.
 function typesCompatible(a, b) {
   return a === b || TYPE_RANK[a] < 3 || TYPE_RANK[b] < 3;
@@ -175,7 +246,10 @@ function buildEvents(mentions) {
       const d = haversineKm(ev.lat, ev.lng, m.place.lat, m.place.lng);
       if (d <= MERGE_KM && d < bestDist) { best = ev; bestDist = d; }
     }
-    const report = { source: m.source, title: m.title, url: m.url, published: m.published, social: m.social, id: m.id, target: m.target };
+    const report = {
+      source: m.source, title: m.title, url: m.url, published: m.published, social: m.social, id: m.id,
+      target: m.target, type: m.type, wire: m.wire, why: m.why, placeName: m.place.name, precision: m.place.precision,
+    };
     if (best) {
       if (!best.urls.has(report.url)) { best.urls.add(report.url); best.reports.push(report); }
       best.sources.add(report.source);
@@ -207,7 +281,9 @@ function buildEvents(mentions) {
     open.push(ev);
   }
   for (const ev of events) {
-    ev.source_count = ev.sources.size;
+    ev.groups = independentGroups(ev.reports);
+    ev.source_count = ev.groups.length; // independent sources
+    ev.outlet_count = ev.sources.size;  // outlet names, before counting reprints and owners once
     ev.status = ev.source_count >= 2 ? "corroborated" : "unverified";
     ev.reports.sort((a, b) => Date.parse(b.published) - Date.parse(a.published));
     // The target most of its headlines name; on a tie, the one the newest headline names.
@@ -564,7 +640,7 @@ function renderPlaces() {
 
 function renderFilters() {
   const types = EVENT_TYPES.map((t) => `<button type="button" class="chip" data-type="${t}" aria-pressed="${state.enabled[t]}">${typeIcon(t)}${TYPE_LABEL[t]}</button>`).join("");
-  const corr = `<button type="button" class="chip corr" data-corr aria-pressed="${state.corroboratedOnly}">Corroborated only</button>`;
+  const corr = `<button type="button" class="chip corr" data-corr aria-pressed="${state.corroboratedOnly}" title="Only events reported by two or more independent sources">2+ sources only</button>`;
   const wins = WINDOWS.map((w) => `<button type="button" class="chip win" data-window="${w.h}" aria-pressed="${state.windowH === w.h}" title="Last ${w.long}">${w.label}</button>`).join("");
   const html = types + corr + '<span class="sep"></span>' + wins;
   document.querySelectorAll("[data-filters]").forEach((el) => { el.innerHTML = html; });
@@ -647,16 +723,62 @@ function renderCard() {
     const corroborated = ev.status === "corroborated";
     const now = Date.now();
     const reports = ev.reports.slice(0, 8).map((r) => `<li><a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${ICON_EXT}
-      <span><span class="src">${esc(r.source)}${r.social ? " · social" : ""} · ${relativeTime(r.published, now)}</span><span class="ttl">${esc(r.title)}</span></span></a></li>`).join("");
+      <span><span class="src">${esc(r.source)}${r.social ? " · social" : ""}${r.wire && r.wire !== r.source ? ` · credits ${esc(r.wire)}` : ""} · ${relativeTime(r.published, now)}</span><span class="ttl">${markTerms(r.title, r.why ? [r.why.type, r.why.place, r.why.target] : [])}</span></span></a></li>`).join("");
     const target = ev.target ? `<p class="hit-target">${targetIcon(ev.target)}<span>Hit: ${esc(TARGETS[ev.target].label)} <span class="muted">(from the headlines)</span></span></p>` : "";
-    card.innerHTML = `<div class="top"><div><p class="kicker ${corroborated ? "multi" : "one"}">${typeIcon(ev.event_type)}${TYPE_LABEL[ev.event_type]} ·${corroborated ? "Corroborated" : "Unverified"}</p><h2>${esc(ev.location_name)}</h2></div>${close}</div>
+    const sourcesLabel = ev.source_count === 1 ? "1 source" : `${ev.source_count} independent sources`;
+    card.innerHTML = `<div class="top"><div><p class="kicker ${corroborated ? "multi" : "one"}">${typeIcon(ev.event_type)}${TYPE_LABEL[ev.event_type]} · ${sourcesLabel}</p><h2>${esc(ev.location_name)}</h2></div>${close}</div>
       <div class="body"><p class="muted">${esc(ev.country)}</p>${target}
-      <p class="meta">${formatUtc(ev.last_updated)} · ${formatLocal(ev.last_updated)}</p>
-      <p class="meta muted">${ev.source_count} ${ev.source_count === 1 ? "source" : "independent sources"}${ev.precision !== "city" ? ` · ${ev.precision} ±${ev.radius_km} km` : ""}</p>
+      <p class="meta">${formatUtc(ev.last_updated)} · ${formatLocal(ev.last_updated)} <span class="muted">(when reported)</span></p>
+      ${whyHtml(ev)}
       <ul class="reports">${reports}</ul>
       <a class="search" href="${esc(xSearchUrl(ev.location_name, ev.event_type))}" target="_blank" rel="noopener noreferrer">Latest posts on X →</a></div>`;
   }
   card.hidden = false;
+}
+
+// A headline with the words the rules matched highlighted (escaped; first match of each term).
+function markTerms(title, terms) {
+  const ranges = [];
+  const lower = title.toLowerCase();
+  for (const term of new Set(terms.filter(Boolean))) {
+    const at = lower.indexOf(term.toLowerCase());
+    if (at >= 0 && !ranges.some(([s, e]) => at < e && at + term.length > s)) ranges.push([at, at + term.length]);
+  }
+  ranges.sort((a, b) => a[0] - b[0]);
+  let out = "";
+  let pos = 0;
+  for (const [s, e] of ranges) {
+    out += esc(title.slice(pos, s)) + `<mark>${esc(title.slice(s, e))}</mark>`;
+    pos = e;
+  }
+  return out + esc(title.slice(pos));
+}
+
+const PRECISION_TEXT = { city: "city, ±10 km", region: "region, ±100 km", country: "whole country, ±300 km" };
+
+// "Why this is on the map": the words behind the type, place, target and source count.
+function whyHtml(ev) {
+  const quote = (s) => `“${esc(s)}”`;
+  const lines = [];
+  const typeR = ev.reports.find((r) => r.type === ev.event_type && r.why);
+  if (typeR) lines.push(`<li><b>${typeIcon(ev.event_type)}${TYPE_LABEL[ev.event_type]}</b> <span>because ${esc(typeR.source)} wrote ${quote(typeR.why.type)}</span></li>`);
+  const placeR = ev.reports.find((r) => r.placeName === ev.location_name && r.why);
+  if (placeR) {
+    const words = placeR.why.cue === "'s" ? `${placeR.why.place}'s` : placeR.why.cue ? `${placeR.why.cue} ${placeR.why.place}` : placeR.why.place;
+    lines.push(`<li><b>${esc(ev.location_name)}</b> <span>(${PRECISION_TEXT[ev.precision]}) because of ${quote(words)}</span></li>`);
+  }
+  const targetR = ev.target && ev.reports.find((r) => r.target === ev.target && r.why && r.why.target);
+  if (targetR) lines.push(`<li><b>${targetIcon(ev.target)}${esc(TARGETS[ev.target].label)}</b> <span>because of ${quote(targetR.why.target)}</span></li>`);
+  // Sources: how the headlines were counted.
+  const headlines = ev.reports.length;
+  let sources = `<b>${ev.source_count === 1 ? "1 source" : `${ev.source_count} independent sources`}</b> <span>from ${headlines} ${headlines === 1 ? "headline" : "headlines"}`;
+  sources += ev.outlet_count !== headlines ? ` by ${ev.outlet_count} ${ev.outlet_count === 1 ? "outlet" : "outlets"}` : "";
+  sources += "</span>";
+  const once = ev.groups
+    .filter((g) => g.reasons.size && new Set(g.reports.map((r) => r.source)).size > 1)
+    .map((g) => `<li class="once">Counted once: ${esc([...new Set(g.reports.map((r) => r.source))].join(", "))} <span>(${esc([...g.reasons].join("; "))})</span></li>`);
+  lines.push(`<li>${sources}</li>`, ...once);
+  return `<div class="why"><p class="why-title">Why this is on the map</p><ul>${lines.join("")}</ul></div>`;
 }
 
 // The Key popover: what the marker shapes, colors and icons mean.
@@ -668,6 +790,7 @@ function renderKey() {
       ${item('<i class="swatch one"></i>', "Hollow ring: 1 source")}
       ${item('<i class="swatch multi"></i>', "Solid dot: 2+ independent sources")}
     </ul>
+    <p class="key-note">Reprints of one wire story, near-identical headlines and outlets with the same owner (RT and Sputnik, for example) count as one source.</p>
     <h2>What happened</h2>
     <ul>${EVENT_TYPES.map((t) => item(typeIcon(t), TYPE_LABEL[t])).join("")}</ul>
     <h2>What was hit <span>(small badge, when the headline says)</span></h2>
