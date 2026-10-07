@@ -25,20 +25,20 @@ var MeridianExtract = (function () {
   ];
 
   // Casualties or damage: makes a bare "strike"/"attack" headline concrete enough to count from any source.
-  const CASUALTY = /\b(killed|kills|killing|dead|deaths?|died|injur\w+|wounded|damag\w+|destroy\w+|casualt\w+|victims?|toll)\b/i;
+  const CASUALTY = /\b(killed|kills|killing|dead|deaths?|died|injur\w+|wounded|damag\w+|destroy\w+|casualt\w+|victims?|toll|catch(es|ing)? fire|caught fire|ablaze|on fire|sinks?|sank|sunk)\b/i;
 
   // Fires count only at these kinds of site (targets from TARGET_RULES below).
   const FIRE_TARGETS = new Set(["fuel", "power", "industry", "military", "ship", "airport", "rail"]);
 
   // A weapon alone ("drone maker opens plant") isn't an event; the headline must also say something happened.
-  const ACTION = /\b(attack(s|ed|ing)?|launch(es|ed|ing)? (\w+ )?(at|on|against|toward|towards)|strikes?|struck|hit(s|ting)?|shot down|downed|intercept(s|ed|ion|ions)?|explosions?|blasts?|explod\w+|detonat\w+|kill(s|ed|ing)?|injur\w+|wound\w+|damag\w+|destroy\w+|fires?|burn(s|ing|ed)?|ablaze|blazes?|engulf\w*|flames|inferno|gutted|(breaks?|broke) out|sank|sinks?|sinking|sunk|target(s|ed|ing)|land(ed|s)? (in|on|near)|impacts?|shelling|shelled|shells|air ?strikes?|air ?raids?|bombed|bombing|bombard\w*|casualt\w+|dead|died|victims?|pounded|hammered)\b/i;
+  const ACTION = /\b(attack(s|ed|ing)?|launch(es|ed|ing)? (\w+ )?(at|on|against|toward|towards)|target|strikes?|struck|hit(s|ting)?|shot down|downed|intercept(s|ed|ion|ions)?|explosions?|blasts?|explod\w+|detonat\w+|kill(s|ed|ing)?|injur\w+|wound\w+|damag\w+|destroy\w+|fires?|burn(s|ing|ed)?|ablaze|blazes?|engulf\w*|flames|inferno|gutted|(breaks?|broke) out|sank|sinks?|sinking|sunk|target(s|ed|ing)|land(ed|s)? (in|on|near)|impacts?|shelling|shelled|shells|air ?strikes?|air ?raids?|bombed|bombing|bombard\w*|casualt\w+|dead|died|victims?|pounded|hammered)\b/i;
 
   // Headlines that use strike words for something else, or talk about what might happen.
-  const NEGATIVE = /\b(on strike|strike action|strikers|workers'? strike|general strike|hunger strike|labou?r strike|walkouts?|explosive (growth|rise|increase|claims?|allegations?|report|interview|testimony)|population explosion|lawsuits?|film (reviews?|festivals?|premieres?)|movies?|documentary|anniversary|years ago|missile tests?|tests?|tested|test[- ]?fir\w*|test[- ]?launch\w*|test flights?|acceptance firing|successfully launch\w*|first release|drills?|military exercises?|contest|parade|contracts?|arms deals?|arms sales?|sale|approved|procure\w*|budget|aid package|unveil\w*|presented|develop\w*|manufactur\w*|delivery|deliveries|supply chain|subsidiary|partnership|SpaceX|NASA|Starship|spacecraft|satellite launch|heart attacks?|panic attacks?|cyber ?-?attacks?|shark attacks?|dog attacks?|bear attacks?|open(ed)? fire|gunfire|fire brigades?|fire season|fire risk|potential|possible|could|might|would|threat of|fears?|plot|prepar\w+|plans? to|expected|may be|risk of|projected)\b/i;
+  const NEGATIVE = /\b(on strike|strike action|strikers|workers'? strike|general strike|hunger strike|labou?r strike|walkouts?|explosive (growth|rise|increase|claims?|allegations?|report|interview|testimony)|population explosion|lawsuits?|acquitt\w+|convict\w+|sentenced|verdict|trials?|plea|hearings?|indict\w+|prosecut\w+|film (reviews?|festivals?|premieres?)|movies?|documentary|anniversary|years ago|missile tests?|tests?|tested|test[- ]?fir\w*|test[- ]?launch\w*|test flights?|acceptance firing|successfully launch\w*|first release|drills?|military exercises?|contest|parade|contracts?|arms deals?|arms sales?|sale|approved|procure\w*|budget|aid package|unveil\w*|presented|develop\w*|manufactur\w*|delivery|deliveries|supply chain|subsidiary|partnership|SpaceX|NASA|Starship|spacecraft|satellite launch|heart attacks?|panic attacks?|cyber ?-?attacks?|shark attacks?|dog attacks?|bear attacks?|open(ed)? fire|gunfire|fire brigades?|fire season|fire risk|potential|possible|could|might|would|threat of|fears?|plot|prepar\w+|plans? to|expected|may be|risk of|projected)\b/i;
 
   // Stories that look back at an earlier attack (features, investigations, recaps). Their publish time is new,
   // but the event isn't: "Generals were warned their Kuwait location was vulnerable. Then an Iranian drone hit".
-  const RETRO = /\b(were warned|was warned|had warned|had been|investigat\w+|probe into|inquiry|report finds|documents show|records show|declassified|look(s|ing)? back|lessons from|recall(s|ed)?|remember(s|ed|ing)?|retrospective|explainer|what we know|how (a|an|the)|why (a|an|the)|inside the|(months?|weeks?|years?) (ago|after|later|on|since)|last (year|month|spring|summer|autumn|fall|winter)|earlier this year|a year (ago|after|since))\b|[.!?]\s+Then\b/i;
+  const RETRO = /\b(were warned|was warned|had warned|had been|investigat\w+|probe into|inquiry|report finds|documents show|records show|declassified|look(s|ing)? back|lessons from|recall(s|ed)?|remember(s|ed|ing)?|retrospective|explainer|what we know|how (a|an|the)|why (a|an|the)|inside the|(months?|weeks?|years?) (ago|after|later|on|since)|last (year|month|spring|summer|autumn|fall|winter)|earlier this year|a year (ago|after|since)|satellite (images?|imagery|photos?) (shows?|reveals?|showing|revealing|confirms?)|releases? (cctv |new )?footage|released (cctv |new )?footage|is an? ([\w-]+,? ){1,4}(weapon|missile|drone|system)s?)\b|[.!?]\s+Then\b/i;
 
   // Month names. "May" also counts only in a date ("May 3", "in May"), since "may" is a common word.
   const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -67,8 +67,8 @@ var MeridianExtract = (function () {
     ["hospital", /\b(hospitals?|clinics?|medical (centre|center|facility|facilities)|ambulances?)\b/i],
     ["airport", /\b(airports?|airfields?|air ?bases?|aerodromes?|runways?|hangars?)\b/i],
     ["fuel", /\b(refiner(y|ies)|oil (depots?|terminals?|facilit\w+|storage|tanks?|fields?|plants?|platforms?)|fuel (depots?|storage|tanks?|facilit\w+|stations?)|petrol(eum)? (depots?|facilit\w+)|gas (plants?|facilit\w+|fields?|stations?)|LNG|pipelines?|tank farm)\b/i],
-    ["power", /\b(power (plants?|stations?|grid|lines?|facilit\w+|infrastructure|substations?)|substations?|thermal (power )?plants?|energy (infrastructure|facilit\w+|sites?)|hydroelectric|dams?|nuclear (power )?plants?|electricity)\b/i],
-    ["rail", /\b(railways?|railroads?|rail (lines?|stations?|infrastructure|depots?|hub)|train stations?|trains?|locomotives?)\b/i],
+    ["power", /\b(power (plants?|stations?|grid|lines?|facilit\w+|infrastructure|substations?)|substations?|thermal (power )?plants?|energy (infrastructure|facilit\w+|sites?|sector)|hydroelectric|dams?|nuclear (power )?plants?|electricity)\b/i],
+    ["rail", /\b(railways?|railroads?|rail (lines?|stations?|infrastructure|depots?|hub)|train stations?|trains?|locomotives?|transport infrastructure)\b/i],
     ["bridge", /\b(bridges?)\b/i],
     ["ship", /\b(ports?|harbou?rs?|docks?|shipyards?|ships?|vessels?|tankers?|freighters?|warships?|frigates?|boats?)\b/i],
     ["military", /\b(military (bases?|facilit\w+|sites?|targets?|positions?|headquarters|HQ|airfields?)|bases?|barracks|command (posts?|centers?|centres?)|headquarters|air defen[cs]e|radars?|ammunition (depots?|warehouses?|dumps?|stores?)|arms (depots?|warehouses?)|weapons (depots?|warehouses?|stores?)|arsenals?|troops)\b/i],
@@ -124,12 +124,13 @@ var MeridianExtract = (function () {
         ["power", stems("подстанц|электростанц|тэц|тэс|гэс|аэс|энергетич|энергообъект|электроснабж")],
         ["rail", stems("железнодорож|жд |вокзал|поезд|локомотив")],
         ["bridge", stems("мост")],
-        ["ship", stems("порт|судн|танкер|корабл|катер")],
+        // "суда" (ships) is also "of the court", so only after merchant/civilian/cargo.
+        ["ship", stems("порт|судн|танкер|корабл|катер|(торгов|гражданск|грузов)[а-я]* суд")],
         ["military", stems("военн[а-я]* (часть|объект|аэродром|баз)|казарм|склад[а-я]* боеприпас|арсенал|штаб")],
         ["industry", stems("завод|предприят|склад|комбинат|фабрик")],
         ["civilian", stems("жил[а-я]* дом|многоэтаж|многоквартир|частн[а-я]* дом|дом[а-я]* |школ|детск[а-я]* сад|рынок|торгов[а-я]* центр")],
       ],
-      cues: new Set(["в", "во", "на", "по", "над", "под", "у", "около", "близ", "возле", "районе"]),
+      cues: new Set(["в", "во", "на", "по", "над", "под", "у", "около", "близ", "возле", "районе", "берегов", "берега", "побережья", "водах"]),
       speaker: /^\s*(заявил|сообщил|заявила|сообщило|сообщили|заявляет|утверждает|обвинил|обвиняет)/i,
       when: [
         ["overnight", stems("ночью|этой ночью|в ночь на|ночная атак")],
@@ -164,7 +165,7 @@ var MeridianExtract = (function () {
         ["industry", stems("завод|підприєм|склад|комбінат|фабрик")],
         ["civilian", stems("житлов|багатоповерх|багатоквартир|приватн[а-яіїєґ]* будин|будин|школ|дитяч[а-яіїєґ]* садок|ринок|торгов[а-яіїєґ]* центр")],
       ],
-      cues: new Set(["в", "у", "на", "по", "над", "під", "біля", "поблизу", "районі"]),
+      cues: new Set(["в", "у", "на", "по", "над", "під", "біля", "поблизу", "районі", "берегів", "берега", "узбережжя", "водах"]),
       speaker: /^\s*(заявив|повідомив|заявила|повідомила|повідомили|стверджує|звинуватив)/i,
       when: [
         ["overnight", stems("вночі|цієї ночі|у ніч на|в ніч на|нічна атак")],
@@ -182,9 +183,9 @@ var MeridianExtract = (function () {
         ["wildfire", anywhere("حرائق الغابات|حريق غابات|حرائق غابات|حريق في غابه")],
         ["environment", anywhere("تسرب نفطي|تسرب الغاز|تسرب غاز|انهيار سد|انهيار منجم|تلوث")],
         ["fire", anywhere("حريق|حرائق|اشتعال|النيران")],
-        ["other", anywhere("هجوم|استهداف|ضربه|ضربات")],
+        ["other", anywhere("هجوم|ستهدف|استهداف|ضربه|ضربات")],
       ],
-      action: anywhere("هجوم|استهداف|سقوط|اسقاط|اعتراض|تعترض|اعترضت|يعترض|مقتل|اصابه|قتلي|جرحي|انفجار|حريق|قصف|ضرب|تدمير|استهدف|شن|غاره|غارات"),
+      action: anywhere("هجوم|ستهدف|استهداف|سقوط|اسقاط|اعتراض|تعترض|اعترضت|يعترض|مقتل|اصابه|قتلي|جرحي|انفجار|حريق|قصف|ضرب|تدمير|شن|غاره|غارات"),
       // Not "ذكري" (anniversary): "On the Oct 7 anniversary, two killed in an airstrike on Gaza" is news.
       negative: anywhere("مناورات|تجربه|استعراض|صفقه|قبل عام|قبل سنوات|محتمل|قد "),
       casualty: anywhere("قتلي|قتيل|مقتل|جرحي|اصابه|اصابات|اضرار|دمار|ضحايا"),
@@ -289,6 +290,10 @@ var MeridianExtract = (function () {
         entry = matcher.regions.get(entry.display) || matcher.regions.get(`${entry.display} Region`) || entry;
       }
       const before = text.slice(Math.max(0, m.index - 24), m.index).toLowerCase().match(/([\p{L}]+)[\s,]*$/u);
+      // "между Москвой и Киевом", "بين موسكو وكييف": "between" two places names neither.
+      if (before && /^(между|між|بين)$/.test(before[1])) continue;
+      if (/(между|між)\s+\S+\s+(и|і|та)\s*$/i.test(text.slice(Math.max(0, m.index - 40), m.index))) continue;
+      if (lang === "ar" && /بين\s+\S+\s+$/.test(text.slice(Math.max(0, m.index - 30), m.index)) && /^و/.test(prefix)) continue;
       const cued = (before && rules.cues.has(before[1])) || /ب/.test(prefix);
       if (entry.precision === "country" && !cued) continue;
       const score = RANK[entry.precision] * 10 + (cued ? 4 : 0) - m.index / 10000;
@@ -413,6 +418,8 @@ var MeridianExtract = (function () {
       if (SPEAKER.test(after)) continue;
       // "Dnipro River", "Don River": the river, not the city.
       if (/^\s+[Rr]iver\b/.test(after)) continue;
+      // "Bulgaria's Black Sea coast", "Black Sea Fleet": the coast or fleet, not the middle of the sea.
+      if (/Sea$/.test(m[1]) && /^\s+(coast|coastline|fleet|port|resort)/i.test(after)) continue;
       // "Kursk region", "Kharkiv Oblast", "Rivers State": the province, even where the name is also a city.
       const suffix = after.match(REGION_SUFFIX);
       let term = m[1];
@@ -426,6 +433,8 @@ var MeridianExtract = (function () {
       let pre = text.slice(Math.max(0, m.index - 40), m.index).toLowerCase();
       while (BETWEEN.test(pre)) pre = pre.replace(BETWEEN, " ");
       const before = pre.match(/([a-z]+)[\s,'’]*$/);
+      // "between Moscow and Kyiv": neither is where it happened.
+      if ((before && before[1] === "between") || /\bbetween\s+[\w'’-]+(\s+[\w'’-]+)?\s+and\s*$/.test(pre)) continue;
       const cued = before && PLACE_CUES.has(before[1]);
       // "Russia's Bryansk", "Russia's oil depot", "Ukraine's south": a place in that country. Not "Russia's gift".
       const possessive = /^['’]s\s+([A-Z]|(largest|biggest|main|key|second|southern|northern|eastern|western|central|south|north|east|west|border|coast|capital|oil|gas|fuel|energy|power|port|airport|refinery|military|nuclear)\b)/.test(after);

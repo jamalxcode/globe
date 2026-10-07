@@ -57,7 +57,12 @@ Hover over the pill for the feed's age and when Bluesky was last checked.
 
 ### Self-audits
 
-Every so often a random sample of real headlines from the live feeds is checked by hand: ones the map accepted (right kind, place, target?) and ones it rejected despite strike words (anything missed?). Every mistake found is fixed and added to `tests/headlines.json`. The first audit (7 Oct 2026, 85 headlines) found 3 wrong pins and 3 vague ones in 40 accepted, and 8 real events missed in 45 rejected; all are now tests.
+Every so often a random sample of real headlines from the live feeds is checked by hand: ones the map accepted (right kind, place, target?) and ones it rejected despite strike words (anything missed?). Every mistake found is fixed and added to `tests/headlines.json`. All are now tests.
+
+| Audit | Checked | Accepted right | Missed in rejected sample |
+|---|---|---|---|
+| 1 (7 Oct 2026) | 40 accepted, 45 rejected | ~85–90% (3 wrong, 3 vague) | 8 of 45 |
+| 2 (7 Oct 2026) | all 122 accepted, 50 rejected | ~95% (4 wrong, 2 questionable) | 7 of 50 |
 
 ### Satellite key
 

@@ -86,6 +86,23 @@
     { "why": "audit: a river named like a city", "title": "Russia strikes bridge over Dnipro River in Ukraine’s Zaporizhzhia, injuring five", "category": "world", "expect": { "type": "other", "place": "Zaporizhzhia", "target": "bridge" } },
     { "why": "film review is not news", "title": "Film review: a drone strike thriller set in Kabul", "category": "world", "expect": null },
     { "why": "heart attack is not an attack", "title": "Former minister dies of heart attack in Kyiv hospital", "category": "world", "expect": null },
+    { "why": "audit 2: court case about an old fire", "title": "SC dismisses Sindh govt's plea against acquittal of 2 MQM workers in Baldia factory fire case", "category": "world", "expect": null },
+    { "why": "audit 2: satellite analysis of an earlier strike", "title": "Satellite images reveal damage from strikes on Russian plant in Ulyanovsk", "category": "world", "expect": null },
+    { "why": "audit 2: weapon spec post", "title": "Japan Japan's Type 25 Hyper Velocity Gliding Projectile (HVGP) is a road-mobile, hypersonic glide weapon that can strike ships", "category": "osint", "social": true, "expect": null },
+    { "why": "audit 2: 'between Moscow and Kyiv' names neither", "title": "Video: 70 missiles and strikes on oil sites between Moscow and Kyiv", "category": "world", "expect": null },
+    { "why": "audit 2: Arabic 'between'", "title": "فيديو.. 70 صاروخا وضربات نفطية بين موسكو وكييف", "category": "world", "expect": null },
+    { "why": "audit 2: 'target' as a verb", "title": "Two Houthi missiles target Yemen's Aden International Airport", "category": "mideast", "expect": { "type": "missile", "place": "Aden", "target": "airport" } },
+    { "why": "audit 2: Arabic 'they target' (يستهدفان)", "title": "صاروخان حوثيان يستهدفان مطار عدن.. وتصعيد عسكري بجبهات اليمن", "category": "mideast", "expect": { "type": "missile", "place": "Aden", "target": "airport" } },
+    { "why": "audit 2: Russian 'in Bulgarian waters'", "title": "Атака беспилотников в болгарских водах: поражены два торговых судна", "category": "world", "expect": { "type": "drone", "place": "Bulgaria", "target": "ship" } },
+    { "why": "audit 2: Yuzhny port", "title": "Russia Strikes Ship Delivering Cargo for Ukrainian Forces at Yuzhny Port", "category": "world", "expect": { "type": "other", "place": "Yuzhny", "target": "ship" } },
+    { "why": "audit 2: 'energy sector' is a power target", "title": "Zelensky on Russian attack: Infrastructure in Kyiv and 12 regions hit, energy sector key target", "category": "world", "expect": { "type": "other", "place": "Kyiv", "target": "power" } },
+    { "why": "audit 2: transport infrastructure", "title": "Russian forces attack transport infrastructure in Zaporizhzhia", "category": "world", "expect": { "type": "other", "place": "Zaporizhzhia", "target": "rail" } },
+    { "why": "audit 2: 'catches fire' counts as damage", "title": "Bird sanctuary in Kyiv Oblast catches fire due to Russian strike", "category": "world", "expect": { "type": "other", "place": "Kyiv Region" } },
+    { "why": "audit 2: Arabic 'targets' (تستهدف) two airports", "title": "جماعة أنصار الله الحوثية \"تستهدف مطارين في الرياض وعدن\"", "category": "world", "expect": { "type": "other", "target": "airport" } },
+    { "why": "audit 2: Russian 'off the coast of Bulgaria'", "title": "Беспилотники впервые атаковали гражданские суда у берегов Болгарии", "category": "world", "expect": { "type": "drone", "place": "Bulgaria", "target": "ship" } },
+    { "why": "audit 2: Black Sea as a place", "title": "Two dead after ship catches fire, sinks in Black Sea", "category": "world", "expect": { "type": "fire", "place": "Black Sea", "target": "ship" } },
+    { "why": "audit 2: 'Black Sea coast' keeps the country", "title": "Drones Hit Ships Off Bulgaria’s Black Sea Coast, Prime Minister Says", "category": "world", "expect": { "type": "drone", "place": "Bulgaria" } },
+    { "why": "audit 2: police footage is a follow-up", "title": "Police release footage of masked man setting car ablaze in Sydney attack", "category": "world", "expect": null },
     { "why": "audit: opinion poll, no place", "title": "Despite intensified Russian attacks, 62% of Ukrainians ready to endure war as long as needed, poll finds", "category": "world", "expect": null }
   ]
 }

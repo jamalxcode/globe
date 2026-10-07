@@ -8,6 +8,7 @@ const PLACE_LINES = `
 Kyiv;Kiev;Ukrainian capital;Ukraine's capital;Ukraine’s capital|Ukraine|50.45|30.52
 Kharkiv;Kharkov|Ukraine|49.99|36.23
 Odesa;Odessa|Ukraine|46.48|30.72
+Yuzhny;Yuzhny Port;Yuzhne;Pivdennyi;Pivdennyi Port|Ukraine|46.62|31.10
 Dnipro;Dnipropetrovsk|Ukraine|48.46|35.05
 Zaporizhzhia;Zaporizhia;Zaporozhye|Ukraine|47.84|35.14
 Kherson|Ukraine|46.64|32.62
@@ -262,6 +263,8 @@ Saada;Sa'ada|Yemen|16.94|43.76
 Mukalla|Yemen|14.54|49.12
 Ras Isa|Yemen|15.20|42.62
 Red Sea|Red Sea|19.50|38.80|r
+Black Sea|Black Sea|43.30|34.00|r
+Sea of Azov;Azov Sea|Sea of Azov|46.00|36.50|r
 Gulf of Aden|Gulf of Aden|12.50|47.50|r
 Bab el-Mandeb;Bab al-Mandab|Red Sea|12.58|43.33|r
 Persian Gulf;Arabian Gulf|Persian Gulf|27.00|51.50|r
