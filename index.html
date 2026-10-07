@@ -20,6 +20,10 @@
 
   <div class="status-wrap"><div id="status" class="status" title="Loading the news feed."><span class="dot"></span><span class="label">Loading</span></div></div>
 
+  <!-- With a mouse, the side panels hide; moving near an edge brings them back. -->
+  <div class="edge edge-left" data-edge="places-panel" aria-hidden="true"><span class="edge-tab">Places</span></div>
+  <div class="edge edge-right" data-edge="feed-panel" aria-hidden="true"><span class="edge-tab">Live feed <b data-feed-count></b></span></div>
+
   <aside id="places-panel" class="panel panel-left">
     <div class="panel-head">
       <button type="button" class="icon-btn sky" data-toggle="places-panel" aria-expanded="true">

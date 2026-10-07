@@ -526,7 +526,15 @@ function focusOn(lat, lng, selection) {
   // (the card sits 22rem from the right edge and is 24rem wide; the left panel ends at 19rem).
   const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
   let cx = W / 2;
-  if (W >= 1100) cx = (19 * rem + (W - 46 * rem)) / 2;
+  if (W >= 1100) {
+    // With auto-hiding panels the card sits at the right edge unless the feed is out.
+    const hiding = autoHide.matches;
+    const placesOut = !hiding || document.getElementById("places-panel").classList.contains("open");
+    const feedOut = !hiding || document.getElementById("feed-panel").classList.contains("open");
+    const left = placesOut ? 14 * rem : 0;
+    const cardLeft = W - (feedOut ? 46 : 25) * rem;
+    cx = (left + cardLeft) / 2;
+  }
   const cy = mobile ? H * 0.22 : W >= 1100 ? H / 2 : H * 0.3;
   const t = d3.zoomIdentity.translate(cx - x * kk, cy - y * kk).scale(kk);
   const duration = reduceMotion ? 0 : 900;
@@ -616,6 +624,41 @@ function renderFeed() {
     }).join("");
   }
   document.querySelectorAll("[data-feed]").forEach((el) => { el.innerHTML = html; });
+  const count = document.querySelector("[data-feed-count]");
+  if (count) count.textContent = state.data && matcher ? `· ${list.length}` : "";
+}
+
+// ---------- auto-hiding side panels (mouse only) ----------
+
+const autoHide = window.matchMedia("(min-width: 768px) and (hover: hover) and (pointer: fine)");
+const HIDE_DELAY_MS = 350;
+
+function setPanelOpen(panel, open) {
+  panel.classList.toggle("open", open);
+  const edge = document.querySelector(`[data-edge="${panel.id}"]`);
+  if (edge) edge.classList.toggle("hide-tab", open);
+  if (panel.id === "feed-panel") document.body.classList.toggle("feed-open", open);
+}
+
+for (const panel of document.querySelectorAll(".panel")) {
+  const edge = document.querySelector(`[data-edge="${panel.id}"]`);
+  let timer = 0;
+  const show = () => { clearTimeout(timer); if (autoHide.matches) setPanelOpen(panel, true); };
+  const hideSoon = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      if (!autoHide.matches || panel.classList.contains("pinned")) return;
+      if (panel.matches(":hover, :focus-within") || (edge && edge.matches(":hover"))) return;
+      setPanelOpen(panel, false);
+    }, HIDE_DELAY_MS);
+  };
+  for (const el of [panel, edge]) {
+    if (!el) continue;
+    el.addEventListener("pointerenter", show);
+    el.addEventListener("pointerleave", hideSoon);
+  }
+  panel.addEventListener("focusin", show);
+  panel.addEventListener("focusout", hideSoon);
 }
 
 function renderCard() {
@@ -673,8 +716,19 @@ document.addEventListener("click", (e) => {
   const toggle = e.target.closest("[data-toggle]");
   if (toggle) {
     const panel = document.getElementById(toggle.dataset.toggle);
+    const label = toggle.querySelector(".sr-only");
+    const title = panel.querySelector("h2").textContent.toLowerCase();
+    if (autoHide.matches) {
+      // Auto-hiding panels: the button pins the panel open instead of collapsing it.
+      const pinned = panel.classList.toggle("pinned");
+      toggle.setAttribute("aria-pressed", String(pinned));
+      toggle.title = pinned ? "Unpin (hide when the mouse leaves)" : "Pin open";
+      if (label) label.textContent = pinned ? `Unpin ${title}` : `Pin ${title} open`;
+      return;
+    }
     const collapsed = panel.classList.toggle("collapsed");
     toggle.setAttribute("aria-expanded", String(!collapsed));
+    if (label) label.textContent = collapsed ? `Expand ${title}` : `Collapse ${title}`;
     return;
   }
   const tab = e.target.closest("[data-tab]");

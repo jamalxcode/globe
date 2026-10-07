@@ -99,7 +99,7 @@ h2, p { margin: 0; }
   border: 1px solid var(--line); border-radius: var(--radius);
   background: rgb(16 21 28 / 0.95);
 }
-.panel-left { left: 1rem; width: 18rem; }
+.panel-left { left: 1rem; width: 13rem; }
 .panel-right { right: 1rem; width: 20rem; }
 .panel.collapsed { width: 3rem; }
 .panel.collapsed > :not(.panel-head), .panel.collapsed .panel-title { display: none; }
@@ -204,6 +204,42 @@ h2, p { margin: 0; }
 /* Wide screens: the card sits beside the feed panel so the marker stays visible. */
 @media (min-width: 1100px) {
   .card { left: auto; right: 22rem; margin: 0; width: 24rem; }
+}
+
+/* Edge tabs: hidden unless the panels auto-hide (see below). */
+.edge { display: none; }
+
+/* With a mouse, the side panels slide away and come back when the pointer nears their edge. */
+@media (min-width: 768px) and (hover: hover) and (pointer: fine) {
+  .panel { transition: transform 0.22s ease, opacity 0.22s ease; }
+  .panel-left:not(.open) { transform: translateX(calc(-100% - 1.5rem)); opacity: 0; pointer-events: none; }
+  .panel-right:not(.open) { transform: translateX(calc(100% + 1.5rem)); opacity: 0; pointer-events: none; }
+  .panel.pinned .panel-head .icon-btn { background: var(--surface-2); }
+
+  .edge { display: flex; position: fixed; top: 0; bottom: 0; z-index: 25; width: 1.5rem; align-items: center; }
+  .edge-left { left: 0; justify-content: flex-start; }
+  .edge-right { right: 0; justify-content: flex-end; }
+  .edge-tab {
+    writing-mode: vertical-rl;
+    padding: 0.75rem 0.3rem;
+    border: 1px solid var(--line);
+    background: rgb(16 21 28 / 0.9);
+    color: var(--muted);
+    font-family: var(--mono); font-size: 0.6875rem; letter-spacing: 0.08em; text-transform: uppercase;
+    white-space: nowrap;
+    transition: opacity 0.2s ease;
+  }
+  /* Turned to read bottom-to-top; after the turn its right side faces the screen edge. */
+  .edge-left .edge-tab { transform: rotate(180deg); border-right: 0; border-radius: var(--radius) 0 0 var(--radius); }
+  .edge-right .edge-tab { border-right: 0; border-radius: var(--radius) 0 0 var(--radius); }
+  .edge-tab b { color: var(--amber); font-weight: 500; }
+  .edge.hide-tab .edge-tab { opacity: 0; }
+
+  /* The card moves to the right edge while the feed is hidden. */
+  .card { transition: right 0.22s ease; }
+}
+@media (min-width: 1100px) and (hover: hover) and (pointer: fine) {
+  body:not(.feed-open) .card { right: 1rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
