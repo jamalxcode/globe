@@ -21,11 +21,11 @@ The map uses the **Equal Earth** projection, which keeps every country at its tr
 ## How a headline becomes a dot
 
 1. **Sources.** The page reads [news.sala.company](https://news.sala.company)'s `feed.json`, the same collection of ~120 public news sites, Telegram channels and Bluesky accounts, and polls the feed's Bluesky accounts directly every minute. Tech, business and science stories are skipped.
-2. **Kind of event.** The headline must name a kind of strike (drone, missile, airstrike, shelling, explosion, or a bare "strike" / "attack" from conflict-focused sources) *and* say something happened (hit, killed, intercepted, shot down…). Headlines about tests, arms deals, drone makers or what *might* happen are dropped. The word lists are at the top of [`app.js`](app.js).
+2. **Kind of event.** The headline must name a kind of strike (drone, missile, airstrike, shelling, explosion, or a bare "strike" / "attack" from conflict-focused sources) *and* say something happened (hit, killed, intercepted, shot down…). Headlines about tests, arms deals, drone makers or what *might* happen are dropped. The word lists are at the top of [`extract.js`](extract.js).
 3. **Place.** The headline is matched against about 2,700 place names: every country on the map, every capital plus each country's 10 largest other cities ([`cities.js`](cities.js), from GeoNames), and ~400 hand-picked conflict-zone towns and regions ([`places.js`](places.js)). The most specific place wins (a city beats a region beats a country), preferring a place right after words like "in", "on" or "hits".
 4. **Merging.** Reports of compatible kinds within 50 km and 3 hours of each other become one event. Each outlet counts once, so an event turns red when two different outlets report it. Google News items count as the outlet named at the end of the headline.
 
-Cities are dots. Regions and whole countries are discs of 100 km and 300 km. Markers fade as they age, and the **6h / 24h / 48h** buttons set how far back the map goes.
+Cities are dots. Regions and whole countries are discs of 100 km and 300 km. Markers fade as they age, and the **1h / 6h / 12h / 24h / 48h** buttons set how far back the map goes (48 hours is everything the feed keeps). Only reports are drawn on the map; the featured locations in the left panel are shortcuts and have no marker.
 
 This is keyword matching, not reading comprehension, so expect some misses and the odd wrong pin. Click any event to see the headlines behind it.
 
@@ -50,7 +50,8 @@ Hover over the pill for the feed's age and when Bluesky was last checked.
 |---|---|
 | `index.html` | Page layout |
 | `style.css` | Look (same palette and fonts as the original Meridian) |
-| `app.js` | Loads the feed, finds events, draws the map and panels |
+| `app.js` | Loads the feed, merges reports into events, draws the map and panels |
+| `extract.js` | The rules that turn a headline into a report: kind of strike, place, source |
 | `places.js` | Hand-picked places, country aliases and featured locations |
 | `cities.js` | Every capital plus each country's 10 largest other cities (generated) |
 | `scripts/` | The generator for `cities.js` and its skip list |

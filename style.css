@@ -58,21 +58,6 @@ h2, p { margin: 0; }
 .dot.amber .core, .dot.amber .halo { fill: var(--amber); }
 .dot.alert .core, .dot.alert .halo { fill: var(--alert); }
 
-.place .core { fill: var(--sky); }
-.place .halo { fill: var(--sky); opacity: 0.25; animation: pulse 3s ease-in-out infinite; }
-.place .hit { fill: transparent; cursor: pointer; }
-.place text {
-  fill: var(--fg);
-  font-family: var(--mono);
-  paint-order: stroke;
-  stroke: var(--bg);
-  stroke-width: 3px;
-  stroke-linejoin: round;
-  pointer-events: none;
-  opacity: 0.8;
-}
-.place.hot text { opacity: 1; fill: var(--sky); }
-
 .burst { fill: none; stroke-width: 2; vector-effect: non-scaling-stroke; pointer-events: none; }
 .flash { pointer-events: none; }
 
@@ -243,5 +228,5 @@ h2, p { margin: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .dot .halo, .place .halo { animation: none; }
+  .dot .halo { animation: none; }
 }
