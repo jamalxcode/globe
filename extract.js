@@ -15,14 +15,17 @@ var MeridianExtract = (function () {
     ["airstrike", /\b(air ?strikes?|air-strikes?|air ?raids?|warplanes?|fighter jets?|bombings?|bombed|bombard\w*|glide bombs?|guided bombs?)\b/i],
     // "shells" only as plural/verb: "Shell" alone is usually the oil company.
     ["shelling", /\b(shelling|shelled|shells|artillery|mortars?|MLRS|howitzers?)\b/i],
-    ["explosion", /\b(explosions?|(a|the|massive|huge|large|powerful|deadly|mine|bomb|twin) blasts?|blasts? (in|at|near|rocks?|rocked|kills?|killed|heard|hits?)|exploded|detonat\w+|car bombs?|IEDs?|blew up|blown up|suicide bomb\w*)\b/i],
+    ["explosion", /\b(explosions?|(a|the|massive|huge|large|powerful|deadly|mine|bomb|twin|two|three|four|several|multiple|series of|\d+) blasts?|blasts? (in|at|near|nearby|rocks?|rocked|kills?|killed|heard|hits?|reported)|exploded|detonat\w+|car bombs?|IEDs?|blew up|blown up|suicide bomb\w*)\b/i],
     // Incidents that hit a country's land, water or resources, accident or not.
     ["wildfire", /\b(wildfires?|wild ?land fires?|forest fires?|bush ?fires?|brush ?fires?|grass ?fires?|peat fires?|fires? (rages?|raging|spreads?|spreading) (through|across))\b/i],
     ["environment", /\b(oil spills?|fuel spills?|chemical spills?|toxic (spills?|leaks?|clouds?)|(gas|ammonia|chlorine|chemical|radiation|radioactive) leaks?|pipeline (leaks?|ruptures?|bursts?|spills?|breach\w*)|oil (leaks?|slicks?)|dam (breach\w*|bursts?|collapses?|failures?)|(dam|levee) (breaks?|broke)|mine (collapses?|accidents?|disasters?|floods?|blasts?|explosions?)|(river|water|sea|lake|groundwater) (contaminat\w+|pollut\w+)|contaminat\w+ (of|in) (the )?(river|water|sea|lake))\b/i],
     // Only at a facility (see FIRE_TARGETS): a refinery fire counts, a house fire doesn't.
     ["fire", /\b(fires?|blaze|ablaze|burn(s|ing)?|flames|inferno)\b/i],
-    ["other", /\b(strikes?|struck|shot down|downed|attacks? on|attacked)\b/i],
+    ["other", /\b(strikes?|struck|shot down|downed|attacks? on|attacked|attacks?)\b/i],
   ];
+
+  // Casualties or damage: makes a bare "strike"/"attack" headline concrete enough to count from any source.
+  const CASUALTY = /\b(killed|kills|killing|dead|deaths?|died|injur\w+|wounded|damag\w+|destroy\w+|casualt\w+|victims?|toll)\b/i;
 
   // Fires count only at these kinds of site (targets from TARGET_RULES below).
   const FIRE_TARGETS = new Set(["fuel", "power", "industry", "military", "ship", "airport", "rail"]);
@@ -31,7 +34,7 @@ var MeridianExtract = (function () {
   const ACTION = /\b(attack(s|ed|ing)?|launch(es|ed|ing)? (\w+ )?(at|on|against|toward|towards)|strikes?|struck|hit(s|ting)?|shot down|downed|intercept(s|ed|ion|ions)?|explosions?|blasts?|explod\w+|detonat\w+|kill(s|ed|ing)?|injur\w+|wound\w+|damag\w+|destroy\w+|fires?|burn(s|ing|ed)?|ablaze|blazes?|engulf\w*|flames|inferno|gutted|(breaks?|broke) out|sank|sinks?|sinking|sunk|target(s|ed|ing)|land(ed|s)? (in|on|near)|impacts?|shelling|shelled|shells|air ?strikes?|air ?raids?|bombed|bombing|bombard\w*|casualt\w+|dead|died|victims?|pounded|hammered)\b/i;
 
   // Headlines that use strike words for something else, or talk about what might happen.
-  const NEGATIVE = /\b(on strike|strike action|strikers|workers'? strike|general strike|hunger strike|labou?r strike|walkouts?|explosive (growth|rise|increase|claims?|allegations?|report|interview|testimony)|population explosion|lawsuits?|films?|movies?|documentary|anniversary|years ago|missile tests?|tests?|tested|test[- ]?fir\w*|test[- ]?launch\w*|test flights?|acceptance firing|successfully launch\w*|first release|drills?|military exercises?|contest|parade|contracts?|arms deals?|arms sales?|sale|approved|procure\w*|budget|aid package|unveil\w*|presented|develop\w*|manufactur\w*|delivery|deliveries|supply chain|subsidiary|partnership|SpaceX|NASA|Starship|spacecraft|satellite launch|open(ed)? fire|gunfire|fire brigades?|fire season|fire risk|potential|possible|could|might|would|threat of|fears?|plot|prepar\w+|plans? to|expected|may be|risk of|projected)\b/i;
+  const NEGATIVE = /\b(on strike|strike action|strikers|workers'? strike|general strike|hunger strike|labou?r strike|walkouts?|explosive (growth|rise|increase|claims?|allegations?|report|interview|testimony)|population explosion|lawsuits?|film (reviews?|festivals?|premieres?)|movies?|documentary|anniversary|years ago|missile tests?|tests?|tested|test[- ]?fir\w*|test[- ]?launch\w*|test flights?|acceptance firing|successfully launch\w*|first release|drills?|military exercises?|contest|parade|contracts?|arms deals?|arms sales?|sale|approved|procure\w*|budget|aid package|unveil\w*|presented|develop\w*|manufactur\w*|delivery|deliveries|supply chain|subsidiary|partnership|SpaceX|NASA|Starship|spacecraft|satellite launch|heart attacks?|panic attacks?|cyber ?-?attacks?|shark attacks?|dog attacks?|bear attacks?|open(ed)? fire|gunfire|fire brigades?|fire season|fire risk|potential|possible|could|might|would|threat of|fears?|plot|prepar\w+|plans? to|expected|may be|risk of|projected)\b/i;
 
   // Stories that look back at an earlier attack (features, investigations, recaps). Their publish time is new,
   // but the event isn't: "Generals were warned their Kuwait location was vulnerable. Then an Iranian drone hit".
@@ -113,6 +116,7 @@ var MeridianExtract = (function () {
       ],
       action: stems("удар|атак|сбит|сбил|попал|поражен|уничтож|погиб|ранен|пострада|пожар|взрыв|обстрел|обломк|прилет|возгоран|загорел|горит|авиаудар|бомбардир"),
       negative: stems("учени|испытан|парад|контракт|закуп|поставк|выставк|годовщин|год назад|лет назад|может|возможн|угроз"),
+      casualty: stems("погиб|ранен|пострада|поврежд|разруш|жертв"),
       targets: [
         ["hospital", stems("больниц|госпитал|поликлиник")],
         ["airport", stems("аэропорт|аэродром|авиабаз")],
@@ -147,6 +151,7 @@ var MeridianExtract = (function () {
       ],
       action: stems("удар|атак|збит|збил|влуч|уражен|знищ|загин|поранен|постражд|пожеж|вибух|обстріл|уламк|приліт|займан|горить|авіаудар"),
       negative: stems("навчан|випробуван|парад|контракт|закупів|постач|виставк|річниц|рік тому|років тому|може|можлив|загроз"),
+      casualty: stems("загин|загибл|поранен|постражд|пошкодж|зруйн|жертв"),
       targets: [
         ["hospital", stems("лікарн|госпітал|поліклінік")],
         ["airport", stems("аеропорт|аеродром|авіабаз")],
@@ -179,8 +184,10 @@ var MeridianExtract = (function () {
         ["fire", anywhere("حريق|حرائق|اشتعال|النيران")],
         ["other", anywhere("هجوم|استهداف|ضربه|ضربات")],
       ],
-      action: anywhere("هجوم|استهداف|سقوط|اسقاط|اعتراض|مقتل|اصابه|قتلي|جرحي|انفجار|حريق|قصف|ضرب|تدمير|استهدف|شن|غاره|غارات"),
-      negative: anywhere("مناورات|تجربه|استعراض|صفقه|ذكري|قبل عام|قبل سنوات|محتمل|قد "),
+      action: anywhere("هجوم|استهداف|سقوط|اسقاط|اعتراض|تعترض|اعترضت|يعترض|مقتل|اصابه|قتلي|جرحي|انفجار|حريق|قصف|ضرب|تدمير|استهدف|شن|غاره|غارات"),
+      // Not "ذكري" (anniversary): "On the Oct 7 anniversary, two killed in an airstrike on Gaza" is news.
+      negative: anywhere("مناورات|تجربه|استعراض|صفقه|قبل عام|قبل سنوات|محتمل|قد "),
+      casualty: anywhere("قتلي|قتيل|مقتل|جرحي|اصابه|اصابات|اضرار|دمار|ضحايا"),
       targets: [
         ["hospital", anywhere("مستشفي|مشفي|مستوصف")],
         ["airport", anywhere("مطار|قاعده جويه")],
@@ -250,7 +257,7 @@ var MeridianExtract = (function () {
       if (!m) continue;
       if (!acted && type !== "wildfire" && type !== "environment") continue;
       if (type === "fire" && !FIRE_TARGETS.has(target)) continue;
-      if (type === "other" && !OTHER_CATEGORIES.has(category)) return null;
+      if (type === "other" && !OTHER_CATEGORIES.has(category) && !target && !rules.casualty.test(text)) return null;
       return { type, term: m[1] || m[0] };
     }
     return null;
@@ -273,10 +280,14 @@ var MeridianExtract = (function () {
     for (const m of text.matchAll(re)) {
       const prefix = lang === "ar" ? m[1] : "";
       const name = lang === "ar" ? m[2] : m[1];
-      const entry = matcher.i18n.get(name);
+      let entry = matcher.i18n.get(name);
       if (!entry) continue;
       const after = text.slice(m.index + m[0].length, m.index + m[0].length + 30);
       if (rules.speaker.test(after)) continue;
+      // "Брянской области", "Харківській області": the province, not the city.
+      if (entry.precision === "city" && /^\s+(област|обл\.|регион|край|краю|облас)/i.test(after)) {
+        entry = matcher.regions.get(entry.display) || matcher.regions.get(`${entry.display} Region`) || entry;
+      }
       const before = text.slice(Math.max(0, m.index - 24), m.index).toLowerCase().match(/([\p{L}]+)[\s,]*$/u);
       const cued = (before && rules.cues.has(before[1])) || /ب/.test(prefix);
       if (entry.precision === "country" && !cued) continue;
@@ -376,7 +387,7 @@ var MeridianExtract = (function () {
       i18n,
       missingI18n: missing,
       // A stem plus up to 3 more letters (case endings); a name with an attached و ف ب ل ك in front.
-      cyrRegex: cyr ? new RegExp(`(?<![\\p{L}])(${cyr})[\\p{L}'’]{0,3}(?![\\p{L}])`, "gu") : null,
+      cyrRegex: cyr ? new RegExp(`(?<![\\p{L}])(${cyr})[\\p{L}'’]{0,4}(?![\\p{L}])`, "gu") : null,
       araRegex: ara ? new RegExp(`(?<![\\p{L}])([وفبلك]{0,2})(${ara})(?![\\p{L}])`, "gu") : null,
     };
   }
@@ -400,6 +411,8 @@ var MeridianExtract = (function () {
       if (!entry) continue;
       const after = text.slice(m.index + m[1].length, m.index + m[1].length + 30);
       if (SPEAKER.test(after)) continue;
+      // "Dnipro River", "Don River": the river, not the city.
+      if (/^\s+[Rr]iver\b/.test(after)) continue;
       // "Kursk region", "Kharkiv Oblast", "Rivers State": the province, even where the name is also a city.
       const suffix = after.match(REGION_SUFFIX);
       let term = m[1];
@@ -414,7 +427,8 @@ var MeridianExtract = (function () {
       while (BETWEEN.test(pre)) pre = pre.replace(BETWEEN, " ");
       const before = pre.match(/([a-z]+)[\s,'’]*$/);
       const cued = before && PLACE_CUES.has(before[1]);
-      const possessive = /^['’]s\b/.test(after);
+      // "Russia's Bryansk", "Russia's oil depot", "Ukraine's south": a place in that country. Not "Russia's gift".
+      const possessive = /^['’]s\s+([A-Z]|(largest|biggest|main|key|second|southern|northern|eastern|western|central|south|north|east|west|border|coast|capital|oil|gas|fuel|energy|power|port|airport|refinery|military|nuclear)\b)/.test(after);
       if (entry.precision === "country" && !cued && !possessive) continue;
       const score = RANK[entry.precision] * 10 + (cued ? 4 : 0) - m.index / 10000;
       if (!best || score > best.score) best = { ...entry, score, term, cue: cued ? before[1] : possessive ? "'s" : null };
@@ -432,7 +446,11 @@ var MeridianExtract = (function () {
       // A wildfire or a spill is itself the incident; everything else also needs a word saying something happened.
       if (!acted && type !== "wildfire" && type !== "environment") continue;
       if (type === "fire" && !FIRE_TARGETS.has(target)) continue;
-      if (type === "other" && !OTHER_CATEGORIES.has(category)) return null;
+      // A bare "strike"/"attack" counts from conflict-focused sources, or anywhere when the headline also names
+      // casualties or what was hit ("Man killed in strike on warehouse in Zaporizhzhia").
+      if (type === "other" && !OTHER_CATEGORIES.has(category) && !target && !CASUALTY.test(title)) return null;
+      // A plain "attack" ("damaged in Russian attack") always needs casualties, damage or a named site.
+      if (type === "other" && /^attacks?$/i.test(m[0]) && !target && !CASUALTY.test(title)) return null;
       return { type, term: m[0] };
     }
     return null;

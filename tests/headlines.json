@@ -69,6 +69,23 @@
     { "why": "Arabic: airstrike on Beirut", "title": "غارة إسرائيلية على الضاحية الجنوبية لبيروت", "category": "mideast", "expect": { "type": "airstrike" } },
     { "why": "Arabic: attached prefix (بغزة)", "title": "مقتل خمسة بقصف مدفعي بغزة", "category": "mideast", "expect": { "type": "shelling", "place": "Gaza" } },
     { "why": "Arabic: refinery fire", "title": "حريق ضخم في مصفاة بنغازي", "category": "world", "expect": { "type": "fire", "place": "Benghazi", "target": "fuel" } },
-    { "why": "Arabic: military exercise is not an event", "title": "مناورات عسكرية بالذخيرة الحية قرب دمشق", "category": "mideast", "expect": null }
+    { "why": "Arabic: military exercise is not an event", "title": "مناورات عسكرية بالذخيرة الحية قرب دمشق", "category": "mideast", "expect": null },
+    { "why": "audit: 'Russia's gift' is not a location; Pryluky is", "title": "Russia's gift to Putin on his birthday. The toll from the strike on a five-story residential building in Pryluky has risen to 9", "category": "osint", "social": true, "expect": { "type": "other", "place": "Pryluky", "target": "civilian" } },
+    { "why": "audit: 'Ukraine's capital' is Kyiv", "title": "Russian missile strike in Ukraine's capital kills at least 2", "category": "world", "expect": { "type": "missile", "place": "Kyiv" } },
+    { "why": "audit: Russian oblast form picks the region", "title": "Над Брянской областью за сутки сбили 18 БПЛА", "category": "world", "expect": { "type": "drone", "place": "Bryansk Region", "precision": "region" } },
+    { "why": "audit: Russian region adjective beats the country", "title": "Россия нанесла новый ракетный удар по Украине. В Черниговской области поврежден жилой дом, погибли девять человек", "category": "world", "expect": { "type": "missile", "place": "Chernihiv Region" } },
+    { "why": "audit: bare strike with a casualty counts from any source", "title": "Man killed in strike on warehouse in Zaporizhzhia", "category": "world", "expect": { "type": "other", "place": "Zaporizhzhia", "target": "industry" } },
+    { "why": "audit: bare strike with a target counts from any source", "title": "Russian forces strike industrial facility in Dnipro", "category": "world", "expect": { "type": "other", "place": "Dnipro", "target": "industry" } },
+    { "why": "audit: attack + damaged", "title": "Dovzhenko Film Studio in Kyiv damaged again in Russian attack", "category": "world", "expect": { "type": "other", "place": "Kyiv" } },
+    { "why": "audit: 'two blasts'", "title": "Two blasts reported nearby Aden International Airport", "category": "mideast", "expect": { "type": "explosion", "place": "Aden", "target": "airport" } },
+    { "why": "audit: Arabic 'intercepts' (verb)", "title": "السعودية تعترض صاروخا أطلقه الحوثي على الرياض", "category": "mideast", "expect": { "type": "missile", "place": "Riyadh" } },
+    { "why": "audit: Arabic anniversary mention doesn't hide a new strike", "title": "مع ذكرى 7 أكتوبر.. قتيلان في غارة جوية على غزة", "category": "mideast", "expect": { "type": "airstrike", "place": "Gaza" } },
+    { "why": "audit: Ukrainian bare strike with casualties", "title": "Вже 15 загиблих від удару Росії по Києву, Прилуках, Кременчуку і Олександрії", "category": "world", "expect": { "type": "other", "place": "Kyiv" } },
+    { "why": "audit: consequence story without casualties or a site", "title": "Russian attack leaves a third of Pryluky residents without gas", "category": "world", "expect": null },
+    { "why": "plain 'attack' without casualties or a site", "title": "Kremlin calls Ukraine's Moscow attack a provocation", "category": "world", "expect": null },
+    { "why": "audit: a river named like a city", "title": "Russia strikes bridge over Dnipro River in Ukraine’s Zaporizhzhia, injuring five", "category": "world", "expect": { "type": "other", "place": "Zaporizhzhia", "target": "bridge" } },
+    { "why": "film review is not news", "title": "Film review: a drone strike thriller set in Kabul", "category": "world", "expect": null },
+    { "why": "heart attack is not an attack", "title": "Former minister dies of heart attack in Kyiv hospital", "category": "world", "expect": null },
+    { "why": "audit: opinion poll, no place", "title": "Despite intensified Russian attacks, 62% of Ukrainians ready to endure war as long as needed, poll finds", "category": "world", "expect": null }
   ]
 }

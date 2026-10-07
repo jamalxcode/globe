@@ -55,6 +55,10 @@ Hover over the pill for the feed's age and when Bluesky was last checked.
 
 [`tests/headlines.json`](tests/headlines.json) holds real and typical headlines (English, Arabic, Russian, Ukrainian) with the right answer: what kind of event, where, what was hit, when, or "not an event". It includes every mistake that has been fixed (the old Kuwait story, "Russia says…", the Cardón refinery fire…), so they can't come back. [`tests/events.json`](tests/events.json) checks the event logic with small scenarios: owners and reprints counting once, combined attacks, weak reports leaving the map after 6 hours, satellite matches and target votes. On every push, [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) runs `node tests/run.mjs`; only if every case passes does it publish the site to GitHub Pages. If a case fails, the last good version stays live and GitHub emails the failure. When a rule is fixed, add its headline as a new case.
 
+### Self-audits
+
+Every so often a random sample of real headlines from the live feeds is checked by hand: ones the map accepted (right kind, place, target?) and ones it rejected despite strike words (anything missed?). Every mistake found is fixed and added to `tests/headlines.json`. The first audit (7 Oct 2026, 85 headlines) found 3 wrong pins and 3 vague ones in 40 accepted, and 8 real events missed in 45 rejected; all are now tests.
+
 ### Satellite key
 
 1. Request a free key at https://firms.modaps.eosdis.nasa.gov/api/map_key/ (email only; it arrives by email).

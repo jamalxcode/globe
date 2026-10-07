@@ -5,7 +5,7 @@
 // Countries come from the map itself (see COUNTRY_ALIASES below), so they aren't listed here.
 // Leave out names that are common words or people's names (Nice, Mobile, Jordan's cities are fine).
 const PLACE_LINES = `
-Kyiv;Kiev|Ukraine|50.45|30.52
+Kyiv;Kiev;Ukrainian capital;Ukraine's capital;Ukraine’s capital|Ukraine|50.45|30.52
 Kharkiv;Kharkov|Ukraine|49.99|36.23
 Odesa;Odessa|Ukraine|46.48|30.72
 Dnipro;Dnipropetrovsk|Ukraine|48.46|35.05
@@ -17,6 +17,8 @@ Sumy|Ukraine|50.91|34.80
 Chernihiv|Ukraine|51.50|31.29
 Poltava|Ukraine|49.59|34.55
 Kremenchuk|Ukraine|49.07|33.42
+Pryluky;Priluki|Ukraine|50.59|32.39
+Oleksandriia;Oleksandriya;Aleksandriya|Ukraine|48.67|33.10
 Kryvyi Rih;Kryvyi Rig;Krivoy Rog|Ukraine|47.91|33.39
 Nikopol|Ukraine|47.57|34.40
 Pavlohrad|Ukraine|48.53|35.87
@@ -66,7 +68,7 @@ Saky|Ukraine|45.13|33.60
 Yevpatoria|Ukraine|45.19|33.37
 Crimea|Ukraine|45.30|34.40|r
 Donbas;Donbass|Ukraine|48.30|38.30|r
-Moscow|Russia|55.76|37.62
+Moscow;Russian capital;Russia's capital;Russia’s capital|Russia|55.76|37.62
 Saint Petersburg;St. Petersburg;St Petersburg|Russia|59.94|30.31
 Belgorod|Russia|50.60|36.59
 Kursk|Russia|51.73|36.19
@@ -174,7 +176,7 @@ Jericho|Palestine|31.86|35.46
 Qalqilya|Palestine|32.19|34.97
 Tubas|Palestine|32.32|35.37
 West Bank|Palestine|31.95|35.25|r
-Beirut|Lebanon|33.89|35.50
+Beirut;Lebanese capital;Lebanon's capital;Lebanon’s capital|Lebanon|33.89|35.50
 Dahiyeh;Dahieh;Dahiya|Lebanon|33.85|35.51
 Tyre|Lebanon|33.27|35.20
 Sidon;Saida|Lebanon|33.56|35.37
@@ -187,7 +189,7 @@ Khiam|Lebanon|33.33|35.61
 Naqoura|Lebanon|33.12|35.14
 Bekaa;Beqaa|Lebanon|33.85|35.90|r
 South Lebanon;southern Lebanon|Lebanon|33.25|35.40|r
-Damascus|Syria|33.51|36.28
+Damascus;Syrian capital;Syria's capital;Syria’s capital|Syria|33.51|36.28
 Aleppo|Syria|36.20|37.13
 Homs|Syria|34.73|36.71
 Hama|Syria|35.13|36.75
@@ -208,7 +210,7 @@ Afrin|Syria|36.51|36.87
 Abu Kamal;Al-Bukamal;Albu Kamal|Syria|34.45|40.92
 Mayadin|Syria|35.02|40.45
 Al-Tanf;Tanf|Syria|33.50|38.62
-Baghdad|Iraq|33.32|44.37
+Baghdad;Iraqi capital;Iraq's capital;Iraq’s capital|Iraq|33.32|44.37
 Erbil;Irbil|Iraq|36.19|44.01
 Mosul|Iraq|36.34|43.12
 Basra|Iraq|30.51|47.78
@@ -226,7 +228,7 @@ Duhok;Dohuk|Iraq|36.87|42.99
 Sinjar|Iraq|36.32|41.87
 Al-Qaim|Iraq|34.37|41.09
 Kurdistan Region;Iraqi Kurdistan|Iraq|36.40|44.30|r
-Tehran|Iran|35.69|51.39
+Tehran;Iranian capital;Iran's capital;Iran’s capital|Iran|35.69|51.39
 Isfahan;Esfahan|Iran|32.65|51.67
 Natanz|Iran|33.72|51.73
 Fordow;Fordo|Iran|34.88|50.99
@@ -251,7 +253,7 @@ Dezful|Iran|32.38|48.40
 Abadan|Iran|30.34|48.30
 Khuzestan|Iran|31.32|48.68|r
 Strait of Hormuz;Hormuz|Iran|26.57|56.25|r
-Sanaa;Sana'a;Sana’a|Yemen|15.37|44.19
+Sanaa;Sana'a;Sana’a;Yemeni capital;Yemen's capital;Yemen’s capital|Yemen|15.37|44.19
 Aden|Yemen|12.79|45.02
 Hodeidah;Hudaydah;Al Hudaydah;Hodeida|Yemen|14.80|42.95
 Marib;Ma'rib|Yemen|15.47|45.32
@@ -264,7 +266,7 @@ Gulf of Aden|Gulf of Aden|12.50|47.50|r
 Bab el-Mandeb;Bab al-Mandab|Red Sea|12.58|43.33|r
 Persian Gulf;Arabian Gulf|Persian Gulf|27.00|51.50|r
 Kuwait City|Kuwait|29.38|47.98
-Riyadh|Saudi Arabia|24.71|46.68
+Riyadh;Saudi capital|Saudi Arabia|24.71|46.68
 Jeddah|Saudi Arabia|21.49|39.19
 Dammam|Saudi Arabia|26.43|50.10
 Abqaiq|Saudi Arabia|25.94|49.68
@@ -287,7 +289,7 @@ Ankara|Turkey|39.93|32.86
 Istanbul|Turkey|41.01|28.98
 Incirlik|Turkey|37.00|35.43
 Diyarbakir|Turkey|37.91|40.24
-Khartoum|Sudan|15.50|32.56
+Khartoum;Sudanese capital;Sudan's capital;Sudan’s capital|Sudan|15.50|32.56
 Omdurman|Sudan|15.64|32.48
 El Fasher;Al-Fashir;El-Fasher|Sudan|13.63|25.35
 Port Sudan|Sudan|19.62|37.22

@@ -1,7 +1,8 @@
 // Arabic, Russian and Ukrainian names for places already in the place lists. One per line:
 //   English name as the place lists spell it|name;name;...
-// Cyrillic names are stems: up to 3 more letters may follow, for case endings (Киев -> Киеве, Київ -> Києві),
-// so give each distinct stem (Київ and Києв). Arabic names may carry an attached و ف ب ل ك in front ("بغزة").
+// Cyrillic names are stems: up to 4 more letters may follow, for case endings (Киев -> Киеве, Київ -> Києві,
+// Брянск -> Брянской), so give each distinct stem (Київ and Києв). A city followed by "области", "регион",
+// "край" or "області" picks its province. Region lines (Kharkiv Region) take the adjective and -щина forms. Arabic names may carry an attached و ف ب ل ك in front ("بغزة").
 // Spelling variants of Arabic letters (أ إ آ ا, ة ه, ى ي) are matched either way.
 // Leave out names that are common words ("Орел" = eagle, "صور" = pictures, "عمان" = Amman and Oman).
 const I18N_NAMES = `
@@ -13,7 +14,22 @@ Zaporizhzhia|Запорож;Запоріж;زابوريجيا
 Kherson|Херсон;خيرسون
 Mykolaiv|Николаев;Миколаїв;Миколаєв;ميكولايف
 Lviv|Львов;Львів;لفيف
-Sumy|Сумы;Сумах;Суми;Сумщин
+Sumy|Сумы;Сумах;Суми
+Pryluky|Прилук
+Oleksandriia|Александри;Олександрі
+Chernihiv Region|Черниговск;Чернігівськ;Чернігівщин;Черниговщин
+Kharkiv Region|Харьковск;Харківськ;Харківщин;Харьковщин
+Sumy Region|Сумск;Сумськ;Сумщин
+Poltava Region|Полтавск;Полтавськ;Полтавщин
+Kyiv Region|Киевск;Київськ;Київщин;Киевщин
+Odessa Region|Одесск;Одеськ;Одещин
+Zaporizhzhia Region|Запорожск;Запорізьк
+Dnipropetrovsk Region|Днепропетровск;Дніпропетровськ;Дніпропетровщин;Днепропетровщин
+Donetsk Region|Донеччин;Донетчин
+Mykolaiv Region|Николаевск;Миколаївськ;Миколаївщин
+Kursk Region|Курщин
+Belgorod Region|Белгородщин;Бєлгородщин
+Bryansk Region|Брянщин
 Chernihiv|Чернигов;Чернігів;Чернігов
 Poltava|Полтав
 Kremenchuk|Кременчуг;Кременчук
