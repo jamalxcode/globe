@@ -24,6 +24,28 @@ var MeridianExtract = (function () {
   // Headlines that use strike words for something else, or talk about what might happen.
   const NEGATIVE = /\b(on strike|strike action|strikers|workers'? strike|general strike|hunger strike|labou?r strike|walkouts?|explosive (growth|rise|increase|claims?|allegations?|report|interview|testimony)|population explosion|lawsuits?|films?|movies?|documentary|anniversary|years ago|missile tests?|tests?|tested|test[- ]?fir\w*|test[- ]?launch\w*|test flights?|acceptance firing|successfully launch\w*|first release|drills?|military exercises?|contest|parade|contracts?|arms deals?|arms sales?|sale|approved|procure\w*|budget|aid package|unveil\w*|presented|develop\w*|manufactur\w*|delivery|deliveries|supply chain|subsidiary|partnership|SpaceX|NASA|Starship|spacecraft|satellite launch|potential|possible|could|might|would|threat of|fears?|plot|prepar\w+|plans? to|expected|may be|risk of|projected)\b/i;
 
+  // Stories that look back at an earlier attack (features, investigations, recaps). Their publish time is new,
+  // but the event isn't: "Generals were warned their Kuwait location was vulnerable. Then an Iranian drone hit".
+  const RETRO = /\b(were warned|was warned|had warned|had been|investigat\w+|probe into|inquiry|report finds|documents show|records show|declassified|look(s|ing)? back|lessons from|recall(s|ed)?|remember(s|ed|ing)?|retrospective|explainer|what we know|how (a|an|the)|why (a|an|the)|inside the|(months?|weeks?|years?) (ago|after|later|on|since)|last (year|month|spring|summer|autumn|fall|winter)|earlier this year|a year (ago|after|since))\b|[.!?]\s+Then\b/i;
+
+  // Month names. "May" also counts only in a date ("May 3", "in May"), since "may" is a common word.
+  const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const MONTH_RE = /\b(January|February|March|April|June|July|August|September|Sept|October|November|December)\b|\b(in|since|last|early|late|mid|of|on) May\b|\bMay \d/g;
+
+  // True when the headline names a month other than the one it was published in (or, in a month's first
+  // three days, the month before), so it's about something that happened earlier.
+  function namesOtherMonth(title, published) {
+    const d = new Date(published);
+    const now = d.getUTCMonth();
+    const prev = d.getUTCDate() <= 3 ? (now + 11) % 12 : now;
+    for (const m of title.matchAll(MONTH_RE)) {
+      const word = m[1] || "May";
+      const index = word === "Sept" ? 8 : MONTHS.indexOf(word);
+      if (index !== now && index !== prev) return true;
+    }
+    return false;
+  }
+
   // A place right after one of these words is more likely where it happened than who did it.
   const PLACE_CUES = new Set(["in", "on", "near", "at", "over", "into", "across", "outside", "inside", "of", "targeting", "targeted", "targets", "hit", "hits", "struck", "strikes", "strike", "attack", "attacks", "attacked", "pounds", "pounded", "bombed", "bombs", "shelled", "shells", "toward", "towards"]);
 
@@ -150,6 +172,7 @@ var MeridianExtract = (function () {
     const t = Date.parse(raw.published);
     if (!Number.isFinite(t)) return null;
     const item = normalize(raw);
+    if (RETRO.test(item.title) || namesOtherMonth(item.title, t)) return null;
     const kind = classify(item.title, item.category);
     if (!kind) return null;
     // Telegram summaries often carry ads, so only news summaries help find the place, and only when they
