@@ -85,6 +85,10 @@ The **Sanctions** button at the top switches the map to US sanctions by country 
 
 The levels are this site's simplification, not an official US scale. They differ mainly in lightness (one hue, brightest = most sanctioned), so they read with any kind of color blindness, and every level is named on hover, in the legend and in the card.
 
+**Reason colors.** The **Severity | Reason** switch in the legend recolors the map by *why*: War & aggression, Weapons & military threat, Repression & corruption, Armed conflict, Terrorism & militias, or Crime, drugs & cyber (Okabe-Ito colors, named in the legend, on hover and in the card).
+
+- Countries with a program of their own have a hand-set main reason (and sometimes a second one, such as Belarus: repression, also war), at full color: `reason` and `reason2` in `SANCTION_COUNTRIES`.
+- Every other country with at least 10 listed people and companies gets the reason most of them are listed for (`FAMILY_REASON` in `sanctions.js`), shown faded, since the country itself isn't sanctioned. Many UAE companies, for example, are listed for Iran-related trade, so the UAE comes out as Weapons & military threat. This updates by itself as the list changes.
 - **Hand-set:** levels 1 to 3 are in `SANCTION_COUNTRIES` in [`sanctions.js`](sanctions.js), with the date they were last checked (`SANCTIONS_CHECKED`). Change a level or note there.
 - **Read daily:** the deploy workflow runs [`scripts/sanctions.mjs`](scripts/sanctions.mjs), which downloads OFAC's SDN list (about 7 MB, at most once a day) and writes `sanctions-data.json`: listed people and companies per country (by address) and per program, plus every program code on the list.
 - **Self-correcting:** if none of a country's program codes is on OFAC's list any more, the program has ended and the map lowers the country to level 4 or 5 by itself (the card says so). Countries without a program are 4 or 5 from the counts.

@@ -90,5 +90,15 @@ function runSanctionChecks(S, countries, regionInfo, regions, mapNames) {
   check(S.regionLevel("Crimea", data).level === 1, "Crimea is level 1 while its code is on the list", S.regionLevel("Crimea", data));
   check(S.regionLevel("Donetsk region", data) === null, "a region whose program ended takes its country's color", S.regionLevel("Donetsk region", data));
   check(S.familyOf("RUSSIA-EO14024") === "Russia / Ukraine" && S.familyOf("SDGT") === "Terrorism", "program codes get plain names", S.familyOf("SDGT"));
+  for (const c of [...countries, ...Object.values(regionInfo)]) {
+    check(!!S.REASON[c.reason] && (!c.reason2 || !!S.REASON[c.reason2]), `unknown reason for ${c.country || c.program}`, c.reason);
+  }
+  const fam = { tags: [], countries: { Mexico: { entities: 50, families: { "Drug trafficking": 40, "Terrorism": 5 } }, Iceland: { entities: 1, families: { "Terrorism": 1 } } } };
+  const mx = S.reasonOf("Mexico", fam, S.levelOf("Mexico", fam));
+  check(mx && mx.reason === "crime" && mx.auto, "a country without a program gets the reason most of its listed are under", mx);
+  check(S.reasonOf("Iceland", fam, S.levelOf("Iceland", fam)) === null, "too few listed: no reason", S.reasonOf("Iceland", fam, S.levelOf("Iceland", fam)));
+  const ru = S.reasonOf("Russia", null, S.levelOf("Russia", null));
+  check(ru && ru.reason === "war" && !ru.auto, "a program country has its hand-set reason", ru);
+  check(S.reasonOf("Puerto Rico", fam, S.levelOf("Puerto Rico", fam)) === null, "the US has no reason", null);
   return { passed, failed };
 }

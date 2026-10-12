@@ -83,6 +83,7 @@ const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").match
 
 const state = {
   view: "strikes",     // "strikes" | "sanctions"
+  sColor: "severity",  // Sanctions view colors: "severity" | "reason"
   data: null,          // last feed.json
   feedOk: null,        // did the last fetch work
   live: new Map(),     // Bluesky items polled from the browser
@@ -886,23 +887,45 @@ function levelKey(r) {
   return r.level ? String(r.level) : "unknown";
 }
 
+function reasonOf(name, r = sanctionOf(name)) {
+  return MeridianSanctions.reasonOf(name, sanctionsData, r);
+}
+
 function sanctionTitle(name, r) {
   if (!r) return countryLabel(name);
   if (r.home) return `${countryLabel(name)}: sets these sanctions`;
-  if (!r.level) return `${countryLabel(name)}: no country program`;
-  return `${countryLabel(name)}: ${MeridianSanctions.LABEL[r.level]}`;
+  const level = r.level ? MeridianSanctions.LABEL[r.level] : "no country program";
+  const why = reasonOf(name, r);
+  if (state.sColor === "reason") {
+    if (!why) return `${countryLabel(name)}: ${level}, no main reason`;
+    return `${countryLabel(name)}: ${MeridianSanctions.REASON[why.reason].label}${why.auto ? " (from who's listed here)" : ""} · ${level}`;
+  }
+  return `${countryLabel(name)}: ${level}${why && !why.auto ? ` · ${MeridianSanctions.REASON[why.reason].label}` : ""}`;
 }
 
-// Colors the countries (and the embargoed regions) for the Sanctions view, or clears them.
+// Colors the countries (and the embargoed regions) for the Sanctions view, or clears them. data-level and
+// data-reason drive the colors (style.css); data-program marks countries with a program of their own, which
+// the Reason colors show at full strength.
 function paintSanctions() {
   const on = state.view === "sanctions";
+  document.body.classList.toggle("s-reason", state.sColor === "reason");
   countriesG.selectAll("path.country")
-    .attr("data-level", (d) => (on ? levelKey(sanctionOf(d.properties.name)) : null))
+    .each(function (d) {
+      const r = on ? sanctionOf(d.properties.name) : null;
+      const why = r ? reasonOf(d.properties.name, r) : null;
+      d3.select(this)
+        .attr("data-level", on ? levelKey(r) : null)
+        .attr("data-reason", why ? why.reason : null)
+        .attr("data-program", r && r.level && r.level <= 3 ? "" : null);
+    })
     .select("title").text((d) => (on ? sanctionTitle(d.properties.name, sanctionOf(d.properties.name)) : countryLabel(d.properties.name)));
   regionsG.selectAll("path")
     .attr("data-level", (d) => levelKey(sanctionOf(d.properties.name)))
+    .attr("data-reason", (d) => { const w = reasonOf(d.properties.name); return w ? w.reason : null; })
+    .attr("data-program", "")
     .style("display", (d) => (sanctionOf(d.properties.name) ? null : "none"))
     .select("title").text((d) => sanctionTitle(d.properties.name, sanctionOf(d.properties.name)));
+  renderSanctionLegend();
 }
 
 function showCountry(name) {
@@ -936,6 +959,15 @@ function sanctionCardHtml(name, close) {
   } else {
     lines.push(`<p class="lvl-line">${levelSwatch("unknown")}<span><b>No country program</b></span></p><p class="muted">OFAC's list couldn't be loaded, so it isn't known whether anyone based here is listed.</p>`);
   }
+  const why = reasonOf(name, r);
+  if (why) {
+    const R = MeridianSanctions.REASON;
+    const second = why.reason2 ? `<span class="muted"> · also </span><span class="s-reason-name">${reasonSwatch(why.reason2)}${esc(R[why.reason2].label)}</span>` : "";
+    const how = why.auto
+      ? `<p class="muted s-small">No program of its own: this is what most of the ${sanctionsData.countries[name].entities.toLocaleString("en")} listed people and companies based here are listed for (${Math.round(why.share * 100)}%).</p>`
+      : `<p class="muted s-small">${esc(R[why.reason].text)}</p>`;
+    lines.push(`<p class="s-reason-line"><span class="muted s-label">Main reason</span><span class="s-reason-name">${reasonSwatch(why.reason)}<b>${esc(R[why.reason].label)}</b></span>${second}</p>${how}`);
+  }
   if (entry && entry.program && !r.lowered) lines.push(`<p class="s-prog"><span class="muted">Program</span> ${esc(entry.program)}</p>`);
   if (entry && entry.note) lines.push(`<p class="s-note">${esc(entry.note)}</p>`);
   if (entry && entry.eased && !r.lowered) lines.push(`<p class="s-flag">Eased recently; the level may change again.</p>`);
@@ -962,9 +994,24 @@ function sanctionCardHtml(name, close) {
     <div class="body s-body">${lines.join("")}</div>`;
 }
 
+function reasonSwatch(id) {
+  return `<i class="lvl" data-reason="${id}"></i>`;
+}
+
+// Legend for the current colors, with the Severity | Reason switch in front.
 function renderSanctionLegend() {
-  const items = SANCTION_LEVELS.map((l) => `<li title="${esc(l.text)}">${levelSwatch(l.level)}<span>${esc(l.label)}</span></li>`).join("");
-  document.querySelectorAll("[data-s-legend]").forEach((el) => { el.innerHTML = items; });
+  const reason = state.sColor === "reason";
+  const toggle = `<li class="s-toggle" role="group" aria-label="Color by">
+    <button type="button" data-scolor="severity" aria-pressed="${!reason}">Severity</button><button type="button" data-scolor="reason" aria-pressed="${reason}">Reason</button></li>`;
+  const items = reason
+    ? SANCTION_REASONS.map((x) => `<li title="${esc(x.text)}">${reasonSwatch(x.id)}<span>${esc(x.label)}</span></li>`).join("")
+    : SANCTION_LEVELS.map((l) => `<li title="${esc(l.text)}">${levelSwatch(l.level)}<span>${esc(l.label)}</span></li>`).join("");
+  document.querySelectorAll("[data-s-legend]").forEach((el) => { el.innerHTML = toggle + items; });
+  document.querySelectorAll("[data-s-legend-note]").forEach((el) => {
+    el.innerHTML = reason
+      ? `<b>Beta.</b> Faded: no country program; the reason comes from who's listed there. Click a country for details. Not legal advice.`
+      : `<b>Beta.</b> US sanctions, simplified, and may be out of date. Click a country for details. Not legal advice.`;
+  });
 }
 
 function renderSanctionKey() {
@@ -972,6 +1019,9 @@ function renderSanctionKey() {
     <h2>US sanctions, by level</h2>
     <ul class="s-key">${SANCTION_LEVELS.map((l) => `<li>${levelSwatch(l.level)}<span><b>${esc(l.label)}</b><br><span class="muted">${esc(l.text)}</span></span></li>`).join("")}
       <li>${levelSwatch("home")}<span><b>United States</b><br><span class="muted">Sets these sanctions.</span></span></li></ul>
+    <h2>Main reason <span>(Reason colors)</span></h2>
+    <ul class="s-key">${SANCTION_REASONS.map((x) => `<li>${reasonSwatch(x.id)}<span><b>${esc(x.label)}</b><br><span class="muted">${esc(x.text)}</span></span></li>`).join("")}</ul>
+    <p>Countries with a program of their own have a hand-set reason, at full color. For the rest, the reason is what most of the people and companies based there are listed for (at least ${REASON_MIN_LISTED} of them), shown faded: many listed companies in the UAE, for example, are there for helping Russia, not because the UAE is sanctioned.</p>
     <p>The levels are this site's simplification of the US Treasury's (OFAC) programs, checked by hand on ${formatDay(SANCTIONS_CHECKED)}. Crimea and the occupied parts of Donetsk and Luhansk are under a full embargo; the whole regions are shaded.</p>
     <p>Counts come from OFAC's list of sanctioned people, companies and ships, read daily. If a country's program disappears from the list, its level drops by itself. A country with many listed companies (the UAE or Turkey, for example) isn't itself sanctioned: those are often front companies.</p>
     <p>Export controls and UN or EU sanctions aren't shown. Not legal advice. Click a country for details.</p>`;
@@ -1051,6 +1101,8 @@ document.addEventListener("click", (e) => {
   if (e.target.closest("[data-close]")) { state.cardOn = false; renderCard(); return; }
   const view = e.target.closest("[data-view]");
   if (view) { setView(view.dataset.view); return; }
+  const scolor = e.target.closest("[data-scolor]");
+  if (scolor) { state.sColor = scolor.dataset.scolor; paintSanctions(); renderCard(); return; }
   if (e.target.closest("[data-reset]")) { resetView(); return; }
   if (e.target.closest("[data-key-toggle]")) { setKeyOpen(document.getElementById("key").hidden); return; }
   if (!e.target.closest("#key")) setKeyOpen(false);
