@@ -291,9 +291,12 @@ function updateStatus() {
   let detail = "Loading the news feed.";
   if (state.view === "sanctions") {
     const list = sanctionsData && sanctionsData.list_date ? ` OFAC's list as of ${formatDay(sanctionsData.list_date)}.` : sanctionsData ? "" : " OFAC's list couldn't be loaded, so only the hand-set levels show.";
-    el.className = "status live";
-    el.title = `US sanctions by country. Levels checked by hand on ${formatDay(SANCTIONS_CHECKED)}.${list}`;
-    el.querySelector(".label").textContent = "US sanctions";
+    // Amber when something needs a person's look: warnings from the daily list check, or old hand-set levels.
+    const checks = MeridianSanctions.needsCheck(sanctionsData);
+    el.className = `status ${checks.length ? "delayed" : "live"}`;
+    el.title = `US sanctions by country. Levels checked by hand on ${formatDay(SANCTIONS_CHECKED)}.${list}`
+      + (checks.length ? `\n\nNeeds a look:\n• ${checks.join("\n• ")}` : "");
+    el.querySelector(".label").textContent = checks.length ? `US sanctions · ${checks.length} to check` : "US sanctions";
     return;
   }
   const generated = state.data && Date.parse(state.data.generated_at);
@@ -869,7 +872,7 @@ async function loadSanctions() {
     if (res.ok) sanctionsData = await res.json();
   } catch { /* the hand-set levels still show */ }
   paintSanctions();
-  if (state.view === "sanctions") { updateStatus(); renderCard(); }
+  if (state.view === "sanctions") { updateStatus(); renderKey(); renderCard(); }
 }
 
 // The map's name for a country, as the rest of the site writes it ("Dem. Rep. Congo" -> "DR Congo").
@@ -897,8 +900,9 @@ function sanctionTitle(name, r) {
   const level = r.level ? MeridianSanctions.LABEL[r.level] : "no country program";
   const why = reasonOf(name, r);
   if (state.sColor === "reason") {
-    if (!why) return `${countryLabel(name)}: ${level}, no main reason`;
-    return `${countryLabel(name)}: ${MeridianSanctions.REASON[why.reason].label}${why.auto ? " (from who's listed here)" : ""} · ${level}`;
+    if (!why) return `${countryLabel(name)}: ${level}, no clear reason`;
+    if (why.auto) return `${countryLabel(name)}: ${level}. Listed here mostly for: ${MeridianSanctions.REASON[why.reason].label.toLowerCase()}`;
+    return `${countryLabel(name)}: ${MeridianSanctions.REASON[why.reason].label} · ${level}`;
   }
   return `${countryLabel(name)}: ${level}${why && !why.auto ? ` · ${MeridianSanctions.REASON[why.reason].label}` : ""}`;
 }
@@ -955,23 +959,23 @@ function sanctionCardHtml(name, close) {
   if (r.home) {
     lines.push(`<p class="lvl-line">${levelSwatch("home")}<span><b>Sets these sanctions</b></span></p>`);
   } else if (level) {
-    lines.push(`<p class="lvl-line">${levelSwatch(r.level)}<span><b>${esc(level.label)}</b> <span class="muted">· level ${r.level} of 5</span></span></p><p class="muted">${esc(level.text)}</p>`);
-  } else {
-    lines.push(`<p class="lvl-line">${levelSwatch("unknown")}<span><b>No country program</b></span></p><p class="muted">OFAC's list couldn't be loaded, so it isn't known whether anyone based here is listed.</p>`);
+    lines.push(`<p class="lvl-line">${levelSwatch(r.level)}<span><b>${esc(level.label)}</b> <span class="muted">· level ${r.level} of ${SANCTION_LEVELS.length}</span></span></p><p class="muted">${esc(level.text)}</p>`);
   }
   const why = reasonOf(name, r);
-  if (why) {
-    const R = MeridianSanctions.REASON;
+  const R = MeridianSanctions.REASON;
+  const since = sanctionsData && sanctionsData.recent_since ? sanctionsData.recent_since.slice(0, 4) : null;
+  if (why && !why.auto) {
     const second = why.reason2 ? `<span class="muted"> · also </span><span class="s-reason-name">${reasonSwatch(why.reason2)}${esc(R[why.reason2].label)}</span>` : "";
-    const how = why.auto
-      ? `<p class="muted s-small">No program of its own: this is what most of the ${sanctionsData.countries[name].entities.toLocaleString("en")} listed people and companies based here are listed for (${Math.round(why.share * 100)}%).</p>`
-      : `<p class="muted s-small">${esc(R[why.reason].text)}</p>`;
-    lines.push(`<p class="s-reason-line"><span class="muted s-label">Main reason</span><span class="s-reason-name">${reasonSwatch(why.reason)}<b>${esc(R[why.reason].label)}</b></span>${second}</p>${how}`);
+    lines.push(`<p class="s-reason-line"><span class="muted s-label">Main reason</span><span class="s-reason-name">${reasonSwatch(why.reason)}<b>${esc(R[why.reason].label)}</b></span>${second}</p><p class="muted s-small">${esc(R[why.reason].text)}</p>`);
+  } else if (why) {
+    // Not a reason for sanctioning the country: what the people and companies here were recently listed for.
+    lines.push(`<p class="s-reason-line"><span class="muted s-label">Listed here mostly for</span><span class="s-reason-name">${reasonSwatch(why.reason)}<b>${esc(R[why.reason].label)}</b></span></p>
+      <p class="muted s-small">${Math.round(why.share * 100)}% of the ${why.recent.toLocaleString("en")} people and companies based here that were listed since ${since}. ${esc(R[why.reason].text)}</p>`);
   }
   if (entry && entry.program && !r.lowered) lines.push(`<p class="s-prog"><span class="muted">Program</span> ${esc(entry.program)}</p>`);
   if (entry && entry.note) lines.push(`<p class="s-note">${esc(entry.note)}</p>`);
   if (entry && entry.eased && !r.lowered) lines.push(`<p class="s-flag">Eased recently; the level may change again.</p>`);
-  if (r.lowered) lines.push(`<p class="s-flag">OFAC's list no longer has anyone under this country's program, so the level was lowered automatically from ${esc(MeridianSanctions.LABEL[r.lowered])} (level ${r.lowered}).</p>`);
+  if (r.lowered) lines.push(`<p class="s-flag">This country's program looks ended: its codes have been off OFAC's list and its page gone from OFAC's site for over ${LOWER_AFTER_DAYS} days. The level was lowered automatically from ${esc(MeridianSanctions.LABEL[r.lowered])} (level ${r.lowered}).</p>`);
   // Who is listed: people, companies and ships with an address here, by program.
   if (sanctionsData) {
     const counts = sanctionsData.countries[name];
@@ -979,7 +983,7 @@ function sanctionCardHtml(name, close) {
       const fams = MeridianSanctions.families(counts).slice(0, 6)
         .map(([label, n]) => `<li><span>${esc(label)}</span><b>${n.toLocaleString("en")}</b></li>`).join("");
       lines.push(`<div class="why"><p class="why-title">On the US list with an address here</p>
-        <p class="s-count"><b>${counts.entities.toLocaleString("en")}</b> ${counts.entities === 1 ? "person, company or ship" : "people, companies and ships"}</p>
+        <p class="s-count"><b>${counts.entities.toLocaleString("en")}</b> ${counts.entities === 1 ? "person, company or ship" : "people, companies and ships"}${counts.recent !== undefined && since ? `<span class="muted">, ${counts.recent.toLocaleString("en")} of them listed since ${since}</span>` : ""}</p>
         <ul class="s-fams">${fams}</ul>
         <p class="muted s-small">By program; some are under several. ${r.level && r.level >= 3 ? "Being listed is about the person or company, not the country." : ""}</p></div>`);
     } else if (!r.home) {
@@ -1009,21 +1013,24 @@ function renderSanctionLegend() {
   document.querySelectorAll("[data-s-legend]").forEach((el) => { el.innerHTML = toggle + items; });
   document.querySelectorAll("[data-s-legend-note]").forEach((el) => {
     el.innerHTML = reason
-      ? `<b>Beta.</b> Faded: no country program; the reason comes from who's listed there. Click a country for details. Not legal advice.`
+      ? `<b>Beta.</b> Faded: no country program, but most people and companies listed there in the last ${RECENT_YEARS} years share one reason. Click a country for details. Not legal advice.`
       : `<b>Beta.</b> US sanctions, simplified, and may be out of date. Click a country for details. Not legal advice.`;
   });
 }
 
 function renderSanctionKey() {
-  document.getElementById("key").innerHTML = `
+  // Also here (not only in the status pill's tooltip), so it can be read on a phone.
+  const checks = MeridianSanctions.needsCheck(sanctionsData);
+  const pending = checks.length ? `<h2>Needs a look</h2><ul class="s-checks">${checks.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` : "";
+  document.getElementById("key").innerHTML = `${pending}
     <h2>US sanctions, by level</h2>
     <ul class="s-key">${SANCTION_LEVELS.map((l) => `<li>${levelSwatch(l.level)}<span><b>${esc(l.label)}</b><br><span class="muted">${esc(l.text)}</span></span></li>`).join("")}
       <li>${levelSwatch("home")}<span><b>United States</b><br><span class="muted">Sets these sanctions.</span></span></li></ul>
     <h2>Main reason <span>(Reason colors)</span></h2>
     <ul class="s-key">${SANCTION_REASONS.map((x) => `<li>${reasonSwatch(x.id)}<span><b>${esc(x.label)}</b><br><span class="muted">${esc(x.text)}</span></span></li>`).join("")}</ul>
-    <p>Countries with a program of their own have a hand-set reason, at full color. For the rest, the reason is what most of the people and companies based there are listed for (at least ${REASON_MIN_LISTED} of them), shown faded: many listed companies in the UAE, for example, are there for helping Russia, not because the UAE is sanctioned.</p>
+    <p>Countries with a program of their own have a hand-set reason, at full color. Any other country is shown faded, and only when it's clear: at least ${REASON_MIN_RECENT} people and companies based there were listed in the last ${RECENT_YEARS} years, and over ${Math.round(REASON_MIN_SHARE * 100)}% of them for one reason. That's about who is listed there, not the country: many companies in the UAE, for example, are listed for helping Iran or Russia get around sanctions.</p>
     <p>The levels are this site's simplification of the US Treasury's (OFAC) programs, checked by hand on ${formatDay(SANCTIONS_CHECKED)}. Crimea and the occupied parts of Donetsk and Luhansk are under a full embargo; the whole regions are shaded.</p>
-    <p>Counts come from OFAC's list of sanctioned people, companies and ships, read daily. If a country's program disappears from the list, its level drops by itself. A country with many listed companies (the UAE or Turkey, for example) isn't itself sanctioned: those are often front companies.</p>
+    <p>Counts come from OFAC's list of sanctioned people, companies and ships, read daily, by address. A program country is lowered by itself only after its codes have been off the list and its page gone from OFAC's site for ${LOWER_AFTER_DAYS} days. The status pill turns amber when something needs a look.</p>
     <p>Export controls and UN or EU sanctions aren't shown. Not legal advice. Click a country for details.</p>`;
 }
 

@@ -38,7 +38,7 @@ jobs:
   deploy:
     needs: test
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -55,7 +55,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-      # US sanctions counts from OFAC's list (reused for a day; see the script). Without it the Sanctions view
+      # US sanctions counts from OFAC's lists (reused for a day; see the script). Without it the Sanctions view
       # still shows the hand-set levels.
       - name: Sanctions list (OFAC)
         run: node scripts/sanctions.mjs _site/sanctions-data.json || rm -f _site/sanctions-data.json

@@ -66,9 +66,8 @@ function runEventChecks(events, suite) {
 }
 
 if (typeof module !== "undefined") module.exports = { runChecks, runEventChecks };
-
-// Checks sanctions.js: names exist on the map, and the self-correcting levels behave. mapNames: the map's
-// country names. Same result shape as runChecks.
+// Checks sanctions.js: names exist on the map, and the self-correcting levels and reasons behave. mapNames: the
+// map's country names. Same result shape as runChecks.
 function runSanctionChecks(S, countries, regionInfo, regions, mapNames) {
   const failed = [];
   let passed = 0;
@@ -77,28 +76,48 @@ function runSanctionChecks(S, countries, regionInfo, regions, mapNames) {
   const shapes = new Set(regions.features.map((f) => f.properties.name));
   for (const name of Object.keys(regionInfo)) check(shapes.has(name), `no shape in regions.js for ${name}`, name);
   for (const name of shapes) check(!!regionInfo[name], `regions.js shape without sanctions info: ${name}`, name);
-  const data = { tags: ["IRAN", "RUSSIA-EO14024", "UKRAINE-EO13685"], countries: { Iran: { entities: 10 }, Cuba: { entities: 3 }, "United Arab Emirates": { entities: 700 } } };
-  check(S.levelOf("Iran", data).level === 1, "Iran stays level 1 while its program is on the list", S.levelOf("Iran", data));
-  const cuba = S.levelOf("Cuba", data);
-  check(cuba.level === 4 && cuba.lowered === 1, "Cuba drops to 4 when no Cuba code is on the list", cuba);
-  check(S.levelOf("Cuba", null).level === 1, "without the list, the hand-set level stands", S.levelOf("Cuba", null));
-  check(S.levelOf("United Arab Emirates", data).level === 4, "listed companies but no program: level 4", S.levelOf("United Arab Emirates", data));
-  check(S.levelOf("Norway", data).level === 5, "nobody listed, no program: level 5", S.levelOf("Norway", data));
-  check(S.levelOf("Norway", null).level === null, "without the list, a country without a program is unknown", S.levelOf("Norway", null));
-  check(S.levelOf("China", { tags: [], countries: {} }).level === 3, "a program without codes is never lowered", S.levelOf("China", { tags: [], countries: {} }));
-  check(S.levelOf("Puerto Rico", data).home === true, "US territories set the sanctions", S.levelOf("Puerto Rico", data));
-  check(S.regionLevel("Crimea", data).level === 1, "Crimea is level 1 while its code is on the list", S.regionLevel("Crimea", data));
-  check(S.regionLevel("Donetsk region", data) === null, "a region whose program ended takes its country's color", S.regionLevel("Donetsk region", data));
-  check(S.familyOf("RUSSIA-EO14024") === "Russia / Ukraine" && S.familyOf("SDGT") === "Terrorism", "program codes get plain names", S.familyOf("SDGT"));
   for (const c of [...countries, ...Object.values(regionInfo)]) {
-    check(!!S.REASON[c.reason] && (!c.reason2 || !!S.REASON[c.reason2]), `unknown reason for ${c.country || c.program}`, c.reason);
+    const label = c.country || c.program;
+    if (c.level <= 3) check(!!S.REASON[c.reason] && (!c.reason2 || !!S.REASON[c.reason2]), `unknown reason for ${label}`, c.reason);
+    if (c.level <= 3) check(Array.isArray(c.pages) && c.pages.length > 0, `no OFAC page for ${label}`, c.pages);
   }
-  const fam = { tags: [], countries: { Mexico: { entities: 50, families: { "Drug trafficking": 40, "Terrorism": 5 } }, Iceland: { entities: 1, families: { "Terrorism": 1 } } } };
-  const mx = S.reasonOf("Mexico", fam, S.levelOf("Mexico", fam));
-  check(mx && mx.reason === "crime" && mx.auto, "a country without a program gets the reason most of its listed are under", mx);
-  check(S.reasonOf("Iceland", fam, S.levelOf("Iceland", fam)) === null, "too few listed: no reason", S.reasonOf("Iceland", fam, S.levelOf("Iceland", fam)));
+
+  // Levels: lowered only when the list check says the program ended.
+  const data = { tags: ["IRAN"], ended: ["Cuba", "Donetsk region"], countries: { Iran: { entities: 10 }, "United Arab Emirates": { entities: 700 } } };
+  check(S.levelOf("Iran", data).level === 1, "Iran stays level 1", S.levelOf("Iran", data));
+  const cuba = S.levelOf("Cuba", data);
+  check(cuba.level === 4 && cuba.lowered === 1, "Cuba drops to 4 once its program is marked ended", cuba);
+  check(S.levelOf("North Korea", data).level === 1, "codes missing but not marked ended (under 7 days): no change", S.levelOf("North Korea", data));
+  check(S.levelOf("Cuba", null).level === 1, "without the list, the hand-set level stands", S.levelOf("Cuba", null));
+  check(S.levelOf("United Arab Emirates", data).level === 4 && S.levelOf("Norway", data).level === 4 && S.levelOf("Norway", null).level === 4, "no program: level 4, list or not", S.levelOf("Norway", null));
+  check(S.levelOf("Puerto Rico", data).home === true, "US territories set the sanctions", S.levelOf("Puerto Rico", data));
+  check(S.regionLevel("Crimea", data).level === 1, "Crimea stays level 1", S.regionLevel("Crimea", data));
+  check(S.regionLevel("Donetsk region", data) === null, "a region whose program ended takes its country's color", S.regionLevel("Donetsk region", data));
+
+  // Reasons: hand-set for program countries; otherwise only when recent listings clearly agree.
+  check(S.familyOf("RUSSIA-EO14024") === "Russia / Ukraine" && S.familyOf("SDGT") === "Terrorism", "program codes get plain names", S.familyOf("SDGT"));
+  check(S.reasonsOfTags(["IRAN"]).join() === "evasion" && S.reasonsOfTags(["SDGT", "SDNTK"]).sort().join() === "crime,terror", "codes map to reasons", S.reasonsOfTags(["SDGT", "SDNTK"]));
   const ru = S.reasonOf("Russia", null, S.levelOf("Russia", null));
   check(ru && ru.reason === "war" && !ru.auto, "a program country has its hand-set reason", ru);
-  check(S.reasonOf("Puerto Rico", fam, S.levelOf("Puerto Rico", fam)) === null, "the US has no reason", null);
+  const fam = { tags: [], countries: {
+    Mexico: { entities: 900, recent: 300, recentReasons: { crime: 250, terror: 10 } },
+    Turkey: { entities: 400, recent: 100, recentReasons: { evasion: 50, terror: 45 } },
+    Iceland: { entities: 30, recent: 5, recentReasons: { terror: 5 } },
+    Norway: { entities: 40 },
+  } };
+  const at = (n) => S.reasonOf(n, fam, S.levelOf(n, fam));
+  check(at("Mexico") && at("Mexico").reason === "crime" && at("Mexico").auto, "recent listings mostly for one reason: that reason, marked automatic", at("Mexico"));
+  check(at("Turkey") === null, "no reason over 60%: none shown", at("Turkey"));
+  check(at("Iceland") === null, "too few recent listings: none shown", at("Iceland"));
+  check(at("Norway") === null, "no dates: none shown", at("Norway"));
+  check(at("Puerto Rico") === null, "the US has no reason", at("Puerto Rico"));
+  check(S.reasonOf("Cuba", data, S.levelOf("Cuba", data)) === null, "a lowered country loses its hand-set reason", S.reasonOf("Cuba", data, S.levelOf("Cuba", data)));
+
+  // What needs a person's look.
+  const fresh = { generated_at: new Date().toISOString(), warnings: [] };
+  check(S.needsCheck(fresh, Date.parse(SANCTIONS_CHECKED) + 864e5).length === 0, "nothing to check when fresh", S.needsCheck(fresh, Date.parse(SANCTIONS_CHECKED) + 864e5));
+  check(S.needsCheck(fresh, Date.parse(SANCTIONS_CHECKED) + 100 * 864e5).some((w) => /checked by hand/.test(w)), "hand-set levels go stale after 90 days", S.needsCheck(fresh, Date.parse(SANCTIONS_CHECKED) + 100 * 864e5));
+  check(S.needsCheck({ ...fresh, warnings: ["x"] }).includes("x"), "list warnings show", null);
+  check(S.needsCheck({ generated_at: "2020-01-01T00:00:00Z" }).some((w) => /last read/.test(w)), "an old list shows", null);
   return { passed, failed };
 }

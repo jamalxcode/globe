@@ -336,7 +336,7 @@ h2, p { margin: 0; }
   --s1: #ffd166;
   --s2: #e8902e;
   --s3: #a24f24;
-  --s4: #4a4039;
+  --s4: var(--land);
   --s5: var(--land);
   --s-home: #3c5576;
 }
@@ -400,6 +400,7 @@ body.view-sanctions .sanctions-legend {
   --r-conflict: #e69f00;
   --r-terror: #56b4e9;
   --r-crime: #009e73;
+  --r-evasion: #c4c4c4;
 }
 body.view-sanctions.s-reason .country { fill: var(--land); }
 body.view-sanctions.s-reason .country[data-level="home"] { fill: var(--s-home); }
@@ -409,6 +410,7 @@ body.view-sanctions.s-reason .country[data-reason="repression"], .lvl[data-reaso
 body.view-sanctions.s-reason .country[data-reason="conflict"], .lvl[data-reason="conflict"] { fill: var(--r-conflict); background: var(--r-conflict); }
 body.view-sanctions.s-reason .country[data-reason="terror"], .lvl[data-reason="terror"] { fill: var(--r-terror); background: var(--r-terror); }
 body.view-sanctions.s-reason .country[data-reason="crime"], .lvl[data-reason="crime"] { fill: var(--r-crime); background: var(--r-crime); }
+body.view-sanctions.s-reason .country[data-reason="evasion"], .lvl[data-reason="evasion"] { fill: var(--r-evasion); background: var(--r-evasion); }
 body.view-sanctions.s-reason .country[data-reason]:not([data-program]) { fill-opacity: 0.38; }
 
 .s-toggle { display: inline-flex !important; gap: 0 !important; margin-right: 0.25rem; }
@@ -423,3 +425,6 @@ body.view-sanctions.s-reason .country[data-reason]:not([data-program]) { fill-op
 .s-reason-line { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.5rem; }
 .s-reason-line .s-label { flex-basis: 100%; font-family: var(--mono); font-size: 0.6875rem; letter-spacing: 0.08em; text-transform: uppercase; }
 .s-reason-name { display: inline-flex; align-items: center; gap: 0.375rem; }
+.key-pop .s-checks { display: flex; flex-direction: column; gap: 0.375rem; padding: 0.5rem 0.625rem; border-left: 3px solid var(--amber); background: var(--surface-2); border-radius: 0.25rem; }
+.key-pop .s-checks li { display: list-item; font-size: 0.75rem; color: var(--fg); }
+.s-count .muted { font-size: 0.8125rem; color: var(--muted); }
