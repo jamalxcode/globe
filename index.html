@@ -19,6 +19,10 @@
   <div id="map" aria-label="World map of reported strikes and explosions"></div>
 
   <div class="status-wrap">
+    <div class="view-switch" role="group" aria-label="Map view">
+      <button type="button" class="status" data-view="strikes" aria-pressed="true" title="Reported strikes, explosions and fires">Strikes</button>
+      <button type="button" class="status" data-view="sanctions" aria-pressed="false" title="Countries colored by US sanctions">Sanctions</button>
+    </div>
     <div id="status" class="status" title="Loading the news feed."><span class="dot"></span><span class="label">Loading</span></div>
     <button type="button" class="status reset" data-reset title="Show the whole world (key: 0)">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
@@ -81,6 +85,11 @@
     <p>Unverified news and social media reports. Not for operational use.</p>
   </div>
 
+  <div class="sanctions-legend">
+    <ul data-s-legend></ul>
+    <p><b>Beta.</b> US sanctions, simplified, and may be out of date. Click a country for details. Not legal advice.</p>
+  </div>
+
   <article id="card" class="card" hidden></article>
 
   <!-- Local copies (d3 7.9.0, topojson 3.0.2), so the map doesn't depend on a CDN being up. -->
@@ -90,6 +99,8 @@
   <script src="cities.js"></script>
   <script src="places.js"></script>
   <script src="names-i18n.js"></script>
+  <script src="regions.js"></script>
+  <script src="sanctions.js"></script>
   <script src="extract.js"></script>
   <script src="events.js"></script>
   <script src="app.js"></script>

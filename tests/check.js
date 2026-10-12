@@ -66,3 +66,29 @@ function runEventChecks(events, suite) {
 }
 
 if (typeof module !== "undefined") module.exports = { runChecks, runEventChecks };
+
+// Checks sanctions.js: names exist on the map, and the self-correcting levels behave. mapNames: the map's
+// country names. Same result shape as runChecks.
+function runSanctionChecks(S, countries, regionInfo, regions, mapNames) {
+  const failed = [];
+  let passed = 0;
+  const check = (ok, why, got) => { if (ok) passed++; else failed.push({ why, title: "sanctions", expected: true, got }); };
+  for (const c of countries) check(mapNames.has(c.country), `sanctions.js names a country that isn't on the map: ${c.country}`, c.country);
+  const shapes = new Set(regions.features.map((f) => f.properties.name));
+  for (const name of Object.keys(regionInfo)) check(shapes.has(name), `no shape in regions.js for ${name}`, name);
+  for (const name of shapes) check(!!regionInfo[name], `regions.js shape without sanctions info: ${name}`, name);
+  const data = { tags: ["IRAN", "RUSSIA-EO14024", "UKRAINE-EO13685"], countries: { Iran: { entities: 10 }, Cuba: { entities: 3 }, "United Arab Emirates": { entities: 700 } } };
+  check(S.levelOf("Iran", data).level === 1, "Iran stays level 1 while its program is on the list", S.levelOf("Iran", data));
+  const cuba = S.levelOf("Cuba", data);
+  check(cuba.level === 4 && cuba.lowered === 1, "Cuba drops to 4 when no Cuba code is on the list", cuba);
+  check(S.levelOf("Cuba", null).level === 1, "without the list, the hand-set level stands", S.levelOf("Cuba", null));
+  check(S.levelOf("United Arab Emirates", data).level === 4, "listed companies but no program: level 4", S.levelOf("United Arab Emirates", data));
+  check(S.levelOf("Norway", data).level === 5, "nobody listed, no program: level 5", S.levelOf("Norway", data));
+  check(S.levelOf("Norway", null).level === null, "without the list, a country without a program is unknown", S.levelOf("Norway", null));
+  check(S.levelOf("China", { tags: [], countries: {} }).level === 3, "a program without codes is never lowered", S.levelOf("China", { tags: [], countries: {} }));
+  check(S.levelOf("Puerto Rico", data).home === true, "US territories set the sanctions", S.levelOf("Puerto Rico", data));
+  check(S.regionLevel("Crimea", data).level === 1, "Crimea is level 1 while its code is on the list", S.regionLevel("Crimea", data));
+  check(S.regionLevel("Donetsk region", data) === null, "a region whose program ended takes its country's color", S.regionLevel("Donetsk region", data));
+  check(S.familyOf("RUSSIA-EO14024") === "Russia / Ukraine" && S.familyOf("SDGT") === "Terrorism", "program codes get plain names", S.familyOf("SDGT"));
+  return { passed, failed };
+}

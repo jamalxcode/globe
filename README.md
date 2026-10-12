@@ -71,6 +71,27 @@ Every so often a random sample of real headlines from the live feeds is checked 
 
 The next hourly run (or **Actions → Test and deploy → Run workflow**) publishes `fires.json`. GitHub pauses scheduled workflows in a repository with no commits for 60 days; if that happens, the satellite data stops refreshing until the next push or a manual run.
 
+## Sanctions view
+
+The **Sanctions** button at the top switches the map to US sanctions by country (**Strikes** switches back). Click a country for its level, program, a short note, and how many people, companies and ships based there are on the US list, by program.
+
+| Level | Meaning | Examples (October 2026) |
+|---|---|---|
+| 1 Full embargo | Nearly all trade banned | Cuba, Iran, North Korea; Crimea and occupied Donetsk and Luhansk |
+| 2 Heavy | Government or whole sectors blocked | Russia; Venezuela (eased: most oil trade licensed since 2026) |
+| 3 Targeted program | A country program aimed at officials, groups, the military or some firms | Belarus, Syria (both eased), Myanmar, China, Sudan, Iraq… |
+| 4 Listed people or companies | No country program, but someone based there is listed | UAE, Turkey, UK, Zimbabwe… |
+| 5 None | No program, nobody listed | Nepal, Botswana… |
+
+The levels are this site's simplification, not an official US scale. They differ mainly in lightness (one hue, brightest = most sanctioned), so they read with any kind of color blindness, and every level is named on hover, in the legend and in the card.
+
+- **Hand-set:** levels 1 to 3 are in `SANCTION_COUNTRIES` in [`sanctions.js`](sanctions.js), with the date they were last checked (`SANCTIONS_CHECKED`). Change a level or note there.
+- **Read daily:** the deploy workflow runs [`scripts/sanctions.mjs`](scripts/sanctions.mjs), which downloads OFAC's SDN list (about 7 MB, at most once a day) and writes `sanctions-data.json`: listed people and companies per country (by address) and per program, plus every program code on the list.
+- **Self-correcting:** if none of a country's program codes is on OFAC's list any more, the program has ended and the map lowers the country to level 4 or 5 by itself (the card says so). Countries without a program are 4 or 5 from the counts.
+- **Warnings:** the workflow run shows a warning for a new program code, a country lowered automatically, or an address country the script doesn't know. These need a look at `sanctions.js`; nothing changes upward by itself.
+- Crimea, Sevastopol and the Donetsk and Luhansk regions are drawn from [`regions.js`](regions.js) (Natural Earth shapes). The embargo covers the Russian-occupied parts; the whole regions are shaded.
+- Not shown: export controls (Commerce), UN and EU sanctions. Not legal advice.
+
 ## Editing
 
 - **Add a place:** add a line to `PLACE_LINES` in `places.js` (`Name;Alias|Country|lat|lng`, with `|r` at the end for a region). Names match case-sensitively on whole words, so leave out places whose names are common words. `places.js` wins when a name is also in `cities.js`.
@@ -91,11 +112,13 @@ The next hourly run (or **Actions → Test and deploy → Run workflow**) publis
 | `places.js` | Hand-picked places, country aliases and featured locations |
 | `cities.js` | Every capital plus each country's 10 largest other cities (generated) |
 | `provinces.js` | Provinces of 21 countries (generated) |
-| `scripts/` | The generators for `cities.js` and `provinces.js`, and the city skip list |
+| `sanctions.js` | Sanctions view: hand-set levels, notes, program names, and the self-correcting rules |
+| `regions.js` | Shapes of the embargoed Ukrainian regions (from Natural Earth) |
+| `scripts/` | The generators for `cities.js` and `provinces.js`, the city skip list, and the satellite and sanctions data jobs |
 
 To regenerate `provinces.js`, download `ne_10m_admin_1_label_points_details.geojson` from [Natural Earth's repository](https://github.com/nvkelso/natural-earth-vector/tree/master/geojson) and run `powershell -File scripts\build-provinces.ps1 -Points <that file>`. The country list and the suffix-only names are at the top of the script.
 
-Libraries are kept in [`vendor/`](vendor), so the map doesn't depend on a CDN: [d3](https://d3js.org) 7.9.0 (map drawing), [topojson](https://github.com/topojson/topojson) 3.0.2 and [world-atlas](https://github.com/topojson/world-atlas) 2.0.2 (country shapes, from Natural Earth). Only the fonts still come from Google Fonts; without them the page falls back to system fonts. Icons adapted from [Lucide](https://lucide.dev) (ISC license). City data © [GeoNames](https://www.geonames.org), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Province data from [Natural Earth](https://www.naturalearthdata.com) (public domain).
+Libraries are kept in [`vendor/`](vendor), so the map doesn't depend on a CDN: [d3](https://d3js.org) 7.9.0 (map drawing), [topojson](https://github.com/topojson/topojson) 3.0.2 and [world-atlas](https://github.com/topojson/world-atlas) 2.0.2 (country shapes, from Natural Earth). Only the fonts still come from Google Fonts; without them the page falls back to system fonts. Icons adapted from [Lucide](https://lucide.dev) (ISC license). City data © [GeoNames](https://www.geonames.org), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Province and region data from [Natural Earth](https://www.naturalearthdata.com) (public domain). Sanctions data from the US Treasury's [OFAC](https://ofac.treasury.gov/sanctions-list-service) (public domain).
 
 ## Run locally
 

@@ -1,5 +1,6 @@
 # On every push, and hourly: check the headline rules against tests/headlines.json, then publish to GitHub
-# Pages, with fresh satellite heat data (fires.json) when the FIRMS_MAP_KEY secret is set.
+# Pages, with fresh satellite heat data (fires.json) when the FIRMS_MAP_KEY secret is set, and OFAC's sanctions
+# list counted per country (sanctions-data.json, refreshed daily).
 # If a check fails, nothing is published: the last good version stays live and GitHub emails the failure.
 name: Test and deploy
 
@@ -50,11 +51,14 @@ jobs:
       - name: Assemble site
         run: |
           mkdir _site
-          cp -r index.html style.css favicon.svg app.js extract.js events.js names-i18n.js places.js cities.js provinces.js vendor _site/
+          cp -r index.html style.css favicon.svg app.js extract.js events.js names-i18n.js places.js cities.js provinces.js regions.js sanctions.js vendor _site/
       - uses: actions/setup-node@v5
-        if: env.FIRMS_MAP_KEY != ''
         with:
           node-version: 22
+      # US sanctions counts from OFAC's list (reused for a day; see the script). Without it the Sanctions view
+      # still shows the hand-set levels.
+      - name: Sanctions list (OFAC)
+        run: node scripts/sanctions.mjs _site/sanctions-data.json || rm -f _site/sanctions-data.json
       # Satellite heat near known cities. A failed download publishes the site without fires.json rather
       # than failing the deploy.
       - name: Satellite heat (NASA FIRMS)

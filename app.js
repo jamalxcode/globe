@@ -9,6 +9,8 @@ const FEED_URL = "https://news.sala.company/feed.json";
 const LOCAL_URL = "https://news.sala.company/local.json"; // non-English sources, built for this map
 const ATLAS_URL = "vendor/countries-50m.json"; // world-atlas 2.0.2 (Natural Earth country shapes), kept in the repo
 const FIRES_URL = "fires.json"; // satellite heat, NASA FIRMS, refreshed hourly by the deploy workflow
+const SANCTIONS_URL = "sanctions-data.json"; // OFAC's list, counted per country, refreshed daily by the deploy workflow
+const OFAC_PROGRAMS_URL = "https://ofac.treasury.gov/sanctions-programs-and-country-information";
 const POLL_S = 60;
 const STALE_MIN = 20; // feed older than this shows "Delayed"
 const { WEAK_HOURS, SAT_KM } = MeridianEvents;
@@ -80,6 +82,7 @@ function typeIcon(type, cls) {
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 const state = {
+  view: "strikes",     // "strikes" | "sanctions"
   data: null,          // last feed.json
   feedOk: null,        // did the last fetch work
   live: new Map(),     // Bluesky items polled from the browser
@@ -123,6 +126,10 @@ function formatUtc(iso) {
 
 function formatLocal(iso) {
   return `${new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(new Date(iso))} local`;
+}
+
+function formatDay(iso) {
+  return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(iso));
 }
 
 function windowInfo(h) {
@@ -281,6 +288,13 @@ function updateStatus() {
   let cls = "";
   let label = "Loading";
   let detail = "Loading the news feed.";
+  if (state.view === "sanctions") {
+    const list = sanctionsData && sanctionsData.list_date ? ` OFAC's list as of ${formatDay(sanctionsData.list_date)}.` : sanctionsData ? "" : " OFAC's list couldn't be loaded, so only the hand-set levels show.";
+    el.className = "status live";
+    el.title = `US sanctions by country. Levels checked by hand on ${formatDay(SANCTIONS_CHECKED)}.${list}`;
+    el.querySelector(".label").textContent = "US sanctions";
+    return;
+  }
   const generated = state.data && Date.parse(state.data.generated_at);
   const age = generated ? Math.round((Date.now() - generated) / 60000) : null;
   const live = state.liveAt ? ` Bluesky checked ${Math.round((Date.now() - state.liveAt) / 1000)}s ago.` : "";
@@ -335,11 +349,12 @@ const root = svg.append("g");
 const sphereEl = root.append("path").attr("class", "sphere");
 const graticuleEl = root.append("path").attr("class", "graticule");
 const countriesG = root.append("g");
+const regionsG = root.append("g").attr("class", "sanction-layer"); // embargoed regions (Sanctions view)
 const bordersEl = root.append("path").attr("class", "borders");
-const discsG = root.append("g");
-const dotsG = root.append("g");
-const clustersG = root.append("g");
-const burstsG = root.append("g");
+const discsG = root.append("g").attr("class", "strike-layer");
+const dotsG = root.append("g").attr("class", "strike-layer");
+const clustersG = root.append("g").attr("class", "strike-layer");
+const burstsG = root.append("g").attr("class", "strike-layer");
 
 // Grouping: markers closer than CLUSTER_PX on screen merge into a numbered bubble, up to CLUSTER_MAX_K zoom.
 const CLUSTER_PX = 26;
@@ -379,6 +394,7 @@ function layout() {
   graticuleEl.attr("d", geoPath(d3.geoGraticule10()));
   if (world) {
     countriesG.selectAll("path").attr("d", geoPath);
+    regionsG.selectAll("path").attr("d", geoPath);
     bordersEl.attr("d", geoPath(world.borders));
   }
   drawEvents();
@@ -649,12 +665,13 @@ function setHover(id) {
 svg.on("click", (e) => {
   const target = e.target.closest("[data-kind]");
   if (!target) return;
-  if (target.dataset.kind === "cluster") zoomToCluster(target.dataset.id);
+  if (target.dataset.kind === "country") { if (state.view === "sanctions") showCountry(target.dataset.id); }
+  else if (target.dataset.kind === "cluster") zoomToCluster(target.dataset.id);
   else pick(target.dataset.kind, target.dataset.id);
 });
 svg.on("pointerover", (e) => {
   const target = e.target.closest("[data-kind]");
-  setHover(target ? target.dataset.id : null);
+  setHover(target && target.dataset.kind !== "country" ? target.dataset.id : null);
 });
 svg.on("pointerleave", () => setHover(null));
 
@@ -747,7 +764,9 @@ function renderCard() {
   const sel = state.selection;
   if (!state.cardOn || !sel) { card.hidden = true; return; }
   const close = `<button type="button" class="icon-btn" data-close aria-label="Close">${ICON_X}</button>`;
-  if (sel.kind === "place") {
+  if (sel.kind === "country") {
+    card.innerHTML = sanctionCardHtml(sel.id, close);
+  } else if (sel.kind === "place") {
     const p = FEATURED_PLACES.find((x) => x.id === sel.id);
     if (!p) { card.hidden = true; return; }
     card.innerHTML = `<div class="top"><div><p class="kicker">Featured location</p><h2>${esc(p.name)}</h2></div>${close}</div>
@@ -839,8 +858,146 @@ function whyHtml(ev) {
   return `<div class="why"><p class="why-title">Why this is on the map</p><ul>${lines.join("")}</ul></div>`;
 }
 
+// ---------- sanctions view ----------
+
+let sanctionsData = null; // sanctions-data.json, or null if it isn't there
+
+async function loadSanctions() {
+  try {
+    const res = await fetch(SANCTIONS_URL, { cache: "no-cache" });
+    if (res.ok) sanctionsData = await res.json();
+  } catch { /* the hand-set levels still show */ }
+  paintSanctions();
+  if (state.view === "sanctions") { updateStatus(); renderCard(); }
+}
+
+// The map's name for a country, as the rest of the site writes it ("Dem. Rep. Congo" -> "DR Congo").
+function countryLabel(name) {
+  return (COUNTRY_ALIASES[name] || [name])[0];
+}
+
+function sanctionOf(name) {
+  return SANCTION_REGION_INFO[name] ? MeridianSanctions.regionLevel(name, sanctionsData) : MeridianSanctions.levelOf(name, sanctionsData);
+}
+
+function levelKey(r) {
+  if (!r) return "none";
+  if (r.home) return "home";
+  return r.level ? String(r.level) : "unknown";
+}
+
+function sanctionTitle(name, r) {
+  if (!r) return countryLabel(name);
+  if (r.home) return `${countryLabel(name)}: sets these sanctions`;
+  if (!r.level) return `${countryLabel(name)}: no country program`;
+  return `${countryLabel(name)}: ${MeridianSanctions.LABEL[r.level]}`;
+}
+
+// Colors the countries (and the embargoed regions) for the Sanctions view, or clears them.
+function paintSanctions() {
+  const on = state.view === "sanctions";
+  countriesG.selectAll("path.country")
+    .attr("data-level", (d) => (on ? levelKey(sanctionOf(d.properties.name)) : null))
+    .select("title").text((d) => (on ? sanctionTitle(d.properties.name, sanctionOf(d.properties.name)) : countryLabel(d.properties.name)));
+  regionsG.selectAll("path")
+    .attr("data-level", (d) => levelKey(sanctionOf(d.properties.name)))
+    .style("display", (d) => (sanctionOf(d.properties.name) ? null : "none"))
+    .select("title").text((d) => sanctionTitle(d.properties.name, sanctionOf(d.properties.name)));
+}
+
+function showCountry(name) {
+  state.selection = { kind: "country", id: name };
+  state.cardOn = true;
+  renderCard();
+}
+
+// d3 reads a ring's direction to tell inside from outside; a shape that would cover most of the globe is
+// wound the other way round.
+function rewind(feature) {
+  if (d3.geoArea(feature) <= 2 * Math.PI) return feature;
+  const coordinates = feature.geometry.coordinates.map((poly) => poly.map((ring) => ring.slice().reverse()));
+  return { ...feature, geometry: { ...feature.geometry, coordinates } };
+}
+
+function levelSwatch(key) {
+  return `<i class="lvl" data-level="${key}"></i>`;
+}
+
+function sanctionCardHtml(name, close) {
+  const region = !!SANCTION_REGION_INFO[name];
+  const r = sanctionOf(name) || MeridianSanctions.levelOf("Ukraine", sanctionsData);
+  const level = r.level ? SANCTION_LEVELS.find((l) => l.level === r.level) : null;
+  const entry = r.entry;
+  const lines = [];
+  if (r.home) {
+    lines.push(`<p class="lvl-line">${levelSwatch("home")}<span><b>Sets these sanctions</b></span></p>`);
+  } else if (level) {
+    lines.push(`<p class="lvl-line">${levelSwatch(r.level)}<span><b>${esc(level.label)}</b> <span class="muted">· level ${r.level} of 5</span></span></p><p class="muted">${esc(level.text)}</p>`);
+  } else {
+    lines.push(`<p class="lvl-line">${levelSwatch("unknown")}<span><b>No country program</b></span></p><p class="muted">OFAC's list couldn't be loaded, so it isn't known whether anyone based here is listed.</p>`);
+  }
+  if (entry && entry.program && !r.lowered) lines.push(`<p class="s-prog"><span class="muted">Program</span> ${esc(entry.program)}</p>`);
+  if (entry && entry.note) lines.push(`<p class="s-note">${esc(entry.note)}</p>`);
+  if (entry && entry.eased && !r.lowered) lines.push(`<p class="s-flag">Eased recently; the level may change again.</p>`);
+  if (r.lowered) lines.push(`<p class="s-flag">OFAC's list no longer has anyone under this country's program, so the level was lowered automatically from ${esc(MeridianSanctions.LABEL[r.lowered])} (level ${r.lowered}).</p>`);
+  // Who is listed: people, companies and ships with an address here, by program.
+  if (sanctionsData) {
+    const counts = sanctionsData.countries[name];
+    if (counts && counts.entities) {
+      const fams = MeridianSanctions.families(counts).slice(0, 6)
+        .map(([label, n]) => `<li><span>${esc(label)}</span><b>${n.toLocaleString("en")}</b></li>`).join("");
+      lines.push(`<div class="why"><p class="why-title">On the US list with an address here</p>
+        <p class="s-count"><b>${counts.entities.toLocaleString("en")}</b> ${counts.entities === 1 ? "person, company or ship" : "people, companies and ships"}</p>
+        <ul class="s-fams">${fams}</ul>
+        <p class="muted s-small">By program; some are under several. ${r.level && r.level >= 3 ? "Being listed is about the person or company, not the country." : ""}</p></div>`);
+    } else if (!r.home) {
+      lines.push(`<p class="muted s-small">Nobody on the US list has an address here.</p>`);
+    }
+  }
+  const asOf = sanctionsData && sanctionsData.list_date ? ` OFAC's list as of ${formatDay(sanctionsData.list_date)}.` : "";
+  lines.push(`<p class="muted s-small">Levels are this site's simplification of US programs, checked by hand on ${formatDay(SANCTIONS_CHECKED)}.${asOf} Not legal advice. Export controls and UN or EU sanctions aren't included.</p>
+    <a class="search" href="${OFAC_PROGRAMS_URL}" target="_blank" rel="noopener noreferrer">OFAC sanctions programs →</a>`);
+  const kicker = region ? "US sanctions · region of Ukraine" : "US sanctions";
+  return `<div class="top"><div><p class="kicker">${kicker}</p><h2>${esc(countryLabel(name))}</h2></div>${close}</div>
+    <div class="body s-body">${lines.join("")}</div>`;
+}
+
+function renderSanctionLegend() {
+  const items = SANCTION_LEVELS.map((l) => `<li title="${esc(l.text)}">${levelSwatch(l.level)}<span>${esc(l.label)}</span></li>`).join("");
+  document.querySelectorAll("[data-s-legend]").forEach((el) => { el.innerHTML = items; });
+}
+
+function renderSanctionKey() {
+  document.getElementById("key").innerHTML = `
+    <h2>US sanctions, by level</h2>
+    <ul class="s-key">${SANCTION_LEVELS.map((l) => `<li>${levelSwatch(l.level)}<span><b>${esc(l.label)}</b><br><span class="muted">${esc(l.text)}</span></span></li>`).join("")}
+      <li>${levelSwatch("home")}<span><b>United States</b><br><span class="muted">Sets these sanctions.</span></span></li></ul>
+    <p>The levels are this site's simplification of the US Treasury's (OFAC) programs, checked by hand on ${formatDay(SANCTIONS_CHECKED)}. Crimea and the occupied parts of Donetsk and Luhansk are under a full embargo; the whole regions are shaded.</p>
+    <p>Counts come from OFAC's list of sanctioned people, companies and ships, read daily. If a country's program disappears from the list, its level drops by itself. A country with many listed companies (the UAE or Turkey, for example) isn't itself sanctioned: those are often front companies.</p>
+    <p>Export controls and UN or EU sanctions aren't shown. Not legal advice. Click a country for details.</p>`;
+}
+
+function setView(view) {
+  if (state.view === view) return;
+  state.view = view;
+  document.body.classList.toggle("view-sanctions", view === "sanctions");
+  document.querySelectorAll("[data-view]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.view === view)));
+  state.selection = null;
+  state.cardOn = false;
+  focusToken = null;
+  setKeyOpen(false);
+  if (autoHide.matches) {
+    for (const panel of document.querySelectorAll(".panel.open:not(.pinned)")) setPanelOpen(panel, false);
+  }
+  renderKey();
+  paintSanctions();
+  updateStatus();
+  render();
+}
+
 // The Key popover: what the marker shapes, colors and icons mean.
 function renderKey() {
+  if (state.view === "sanctions") { renderSanctionKey(); return; }
   const item = (icon, label) => `<li>${icon}<span>${esc(label)}</span></li>`;
   document.getElementById("key").innerHTML = `
     <h2>Sources</h2>
@@ -892,6 +1049,8 @@ document.addEventListener("click", (e) => {
     return;
   }
   if (e.target.closest("[data-close]")) { state.cardOn = false; renderCard(); return; }
+  const view = e.target.closest("[data-view]");
+  if (view) { setView(view.dataset.view); return; }
   if (e.target.closest("[data-reset]")) { resetView(); return; }
   if (e.target.closest("[data-key-toggle]")) { setKeyOpen(document.getElementById("key").hidden); return; }
   if (!e.target.closest("#key")) setKeyOpen(false);
@@ -939,6 +1098,7 @@ document.addEventListener("keydown", (e) => {
 
 async function start() {
   renderKey();
+  renderSanctionLegend();
   render();
   layout();
   new ResizeObserver(() => layout()).observe(mapEl);
@@ -948,12 +1108,17 @@ async function start() {
     const countries = topojson.feature(topo, topo.objects.countries).features;
     world = { borders: topojson.mesh(topo, topo.objects.countries, (a, b) => a !== b) };
     countriesG.selectAll("path").data(countries).join("path").attr("class", "country").attr("d", geoPath)
-      .append("title").text((d) => (COUNTRY_ALIASES[d.properties.name] || [d.properties.name])[0]);
+      .attr("data-kind", "country").attr("data-id", (d) => d.properties.name)
+      .append("title").text((d) => countryLabel(d.properties.name));
+    regionsG.selectAll("path").data(SANCTION_REGIONS.features.map(rewind)).join("path").attr("class", "region").attr("d", geoPath)
+      .attr("data-kind", "country").attr("data-id", (d) => d.properties.name)
+      .append("title");
     bordersEl.attr("d", geoPath(world.borders));
     matcher = MeridianExtract.buildMatcher(countries);
   } catch {
     document.getElementById("status").title = "The world map didn't load. Reload the page to try again.";
   }
+  loadSanctions();
   await Promise.all([feed, loadFires()]);
   rebuild();
   // Satellite data changes hourly at most.

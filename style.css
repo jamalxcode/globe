@@ -96,6 +96,7 @@ h2, p { margin: 0; }
   border: 1px solid var(--line); border-radius: var(--radius);
   background: rgb(16 21 28 / 0.95);
   font-family: var(--mono); font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase;
+  white-space: nowrap;
 }
 .status .dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--muted); }
 .status.live .dot { background: var(--sky); }
@@ -315,3 +316,77 @@ h2, p { margin: 0; }
 @media (prefers-reduced-motion: reduce) {
   .dot .halo { animation: none; }
 }
+
+/* View switch: Strikes | Sanctions */
+.view-switch { display: flex; }
+.view-switch .status { color: var(--muted); }
+.view-switch .status:first-child { border-radius: var(--radius) 0 0 var(--radius); }
+.view-switch .status:last-child { border-radius: 0 var(--radius) var(--radius) 0; border-left: 0; }
+.view-switch .status:hover { color: var(--fg); background: var(--surface-2); }
+.view-switch .status[aria-pressed="true"] { color: var(--bg); background: var(--sky); border-color: var(--sky); font-weight: 500; }
+@media (max-width: 559px) {
+  .status-wrap { gap: 0.375rem; }
+  .status-wrap > .status:not(.reset) .label, .status.reset span { display: none; }
+  .status { padding: 0.5rem 0.625rem; }
+}
+
+/* Sanctions view. Levels differ mainly in lightness (one hue, bright = most sanctioned), so they read with any
+   kind of color blindness; each level is also named on hover, in the legend and in the card. */
+:root {
+  --s1: #ffd166;
+  --s2: #e8902e;
+  --s3: #a24f24;
+  --s4: #4a4039;
+  --s5: var(--land);
+  --s-home: #3c5576;
+}
+.sanction-layer { display: none; }
+body.view-sanctions .sanction-layer { display: inline; }
+body.view-sanctions .strike-layer { display: none; }
+body.view-sanctions .country, body.view-sanctions .region { cursor: pointer; }
+body.view-sanctions .country[data-level="1"], .region[data-level="1"], .lvl[data-level="1"] { fill: var(--s1); background: var(--s1); }
+body.view-sanctions .country[data-level="2"], .lvl[data-level="2"] { fill: var(--s2); background: var(--s2); }
+body.view-sanctions .country[data-level="3"], .lvl[data-level="3"] { fill: var(--s3); background: var(--s3); }
+body.view-sanctions .country[data-level="4"], .lvl[data-level="4"] { fill: var(--s4); background: var(--s4); }
+body.view-sanctions .country[data-level="5"], .lvl[data-level="5"] { fill: var(--s5); background: var(--s5); }
+body.view-sanctions .country[data-level="home"], .lvl[data-level="home"] { fill: var(--s-home); background: var(--s-home); }
+.lvl[data-level="unknown"] { background: var(--land); }
+.region { stroke: var(--bg); stroke-width: 0.8; stroke-dasharray: 3 2; vector-effect: non-scaling-stroke; }
+body.view-sanctions .country:hover, body.view-sanctions .region:hover { stroke: var(--fg); stroke-width: 1.5; stroke-dasharray: none; vector-effect: non-scaling-stroke; filter: brightness(1.12); }
+.lvl { display: inline-block; width: 0.875rem; height: 0.875rem; flex-shrink: 0; border-radius: 0.2rem; border: 1px solid rgb(255 255 255 / 0.25); }
+
+/* Strike panels, legend and sheet step aside; the sanctions legend takes the footer. */
+body.view-sanctions .panel, body.view-sanctions .edge, body.view-sanctions .footer-note,
+body.view-sanctions .sheet, body.view-sanctions .beta-note { display: none !important; }
+.sanctions-legend { display: none; }
+body.view-sanctions .sanctions-legend {
+  position: fixed; left: 0.5rem; right: 0.5rem; bottom: 0.5rem; z-index: 20;
+  display: flex; flex-direction: column; align-items: center; gap: 0.25rem;
+  font-size: 0.75rem; color: var(--muted); text-align: center; pointer-events: none;
+}
+.sanctions-legend ul { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.25rem 0.875rem; color: var(--fg); pointer-events: auto; }
+.sanctions-legend li { display: inline-flex; align-items: center; gap: 0.375rem; }
+@media (max-width: 767px) {
+  body.view-sanctions .sanctions-legend { padding: 0.5rem; border: 1px solid var(--line); border-radius: var(--radius); background: rgb(16 21 28 / 0.95); }
+}
+@media (min-width: 1100px) {
+  body.view-sanctions .card { right: 1rem; }
+}
+
+/* Sanctions card */
+.s-body { display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.875rem; line-height: 1.4; }
+.s-body .why { margin-top: 0.25rem; }
+.lvl-line { display: flex; align-items: center; gap: 0.5rem; }
+.lvl-line .lvl { width: 1.125rem; height: 1.125rem; }
+.s-prog .muted { display: block; font-family: var(--mono); font-size: 0.6875rem; letter-spacing: 0.08em; text-transform: uppercase; }
+.s-flag { padding: 0.375rem 0.625rem; border-left: 3px solid var(--sky); background: var(--surface-2); border-radius: 0.25rem; font-size: 0.8125rem; }
+.s-count { margin-top: 0.375rem; }
+.s-count b { font-family: var(--mono); font-size: 1rem; }
+.s-fams { display: flex; flex-direction: column; gap: 0.2rem; margin-top: 0.375rem; font-size: 0.8125rem; }
+.s-fams li { display: flex; justify-content: space-between; gap: 0.75rem; }
+.s-fams b { font-family: var(--mono); font-weight: 500; font-variant-numeric: tabular-nums; }
+.card .s-small, .s-small { font-size: 0.75rem; }
+.s-key { grid-template-columns: 1fr !important; }
+.s-key li { align-items: flex-start; }
+.s-key .lvl { margin-top: 0.15rem; }
+.sanctions-legend b { color: var(--one); font-weight: 600; }

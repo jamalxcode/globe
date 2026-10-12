@@ -11,7 +11,7 @@ const read = (f) => readFileSync(path.join(root, f), "utf8");
 
 // Same scripts, same order as index.html, in one shared context (like <script> tags on a page).
 const context = vm.createContext({ console });
-for (const file of ["vendor/d3.min.js", "vendor/topojson.min.js", "provinces.js", "cities.js", "places.js", "names-i18n.js", "extract.js", "events.js", "tests/check.js"]) {
+for (const file of ["vendor/d3.min.js", "vendor/topojson.min.js", "provinces.js", "cities.js", "places.js", "names-i18n.js", "regions.js", "sanctions.js", "extract.js", "events.js", "tests/check.js"]) {
   vm.runInContext(read(file), context, { filename: file });
 }
 
@@ -21,16 +21,22 @@ const extract = vm.runInContext("MeridianExtract", context);
 const matcher = extract.buildMatcher(countries);
 const headlines = context.runChecks(extract, matcher, JSON.parse(read("tests/headlines.json")));
 const events = context.runEventChecks(vm.runInContext("MeridianEvents", context), JSON.parse(read("tests/events.json")));
+const sanctions = context.runSanctionChecks(
+  vm.runInContext("MeridianSanctions", context), vm.runInContext("SANCTION_COUNTRIES", context),
+  vm.runInContext("SANCTION_REGION_INFO", context), vm.runInContext("SANCTION_REGIONS", context),
+  new Set(countries.map((c) => c.properties.name)),
+);
 
 // Every non-English place name must point at a known place.
 const missing = [...matcher.missingI18n];
 
-for (const f of [...headlines.failed, ...events.failed]) {
+for (const f of [...headlines.failed, ...events.failed, ...sanctions.failed]) {
   console.log(`FAIL  ${f.why}\n      ${f.title}\n      expected ${JSON.stringify(f.expected)}\n      got      ${JSON.stringify(f.got)}`);
 }
 if (missing.length) console.log(`FAIL  names-i18n.js names places that don't exist: ${missing.join(", ")}`);
-const failedCount = headlines.failed.length + events.failed.length + (missing.length ? 1 : 0);
+const failedCount = headlines.failed.length + events.failed.length + sanctions.failed.length + (missing.length ? 1 : 0);
 console.log(`headlines: ${headlines.passed} passed, ${headlines.failed.length} failed`);
 console.log(`events: ${events.passed} passed, ${events.failed.length} failed`);
-console.log(`${headlines.passed + events.passed} passed, ${failedCount} failed`);
+console.log(`sanctions: ${sanctions.passed} passed, ${sanctions.failed.length} failed`);
+console.log(`${headlines.passed + events.passed + sanctions.passed} passed, ${failedCount} failed`);
 process.exit(failedCount ? 1 : 0);
