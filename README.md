@@ -73,30 +73,34 @@ The next hourly run (or **Actions → Test and deploy → Run workflow**) publis
 
 ## Sanctions view
 
-The **Sanctions** button at the top switches the map to US sanctions by country (**Strikes** switches back). Click a country for its level, reason, program, a short note, and how many people, companies and ships based there are on the US list (in all, and since 5 years ago), by program.
+The switch at the top has three views: **Strikes**, **Sanctions** (countries colored by how heavy US sanctions are) and **Reasons** (colored by why). Click a country, or find it in the **Countries** list (left edge; on phones, the Countries tab at the bottom), for its level, reason, program, a short dated note, and how many people, companies and ships are on the US list there: in all, since 5 years ago and in the last 30 days, by program.
 
 | Level | Meaning | Examples (October 2026) |
 |---|---|---|
-| 1 Full embargo | Nearly all trade banned | Cuba, Iran, North Korea; Crimea and occupied Donetsk and Luhansk |
+| 1 Full embargo | Nearly all trade banned | Cuba, Iran, North Korea; Crimea; occupied Donetsk and Luhansk (hatched: only the occupied part) |
 | 2 Heavy | Government or whole sectors blocked | Russia; Venezuela (eased: most oil trade licensed since 2026) |
 | 3 Targeted program | A country program aimed at officials, groups, the military or some firms | Belarus, Syria (both eased), Myanmar, China, Sudan, Iraq… |
 | 4 No country program | Everyone else; the card shows who is listed there | UAE, Turkey, UK, Zimbabwe… |
 
-The levels are this site's simplification, not an official US scale. They differ mainly in lightness (one hue, brightest = most sanctioned), so they read with any kind of color blindness, and every level is named on hover, in the legend and in the card.
+A **+** badge marks countries also under broad US export controls on technology (China, Russia, Belarus, Iran, North Korea, Cuba, Venezuela), which the levels don't include. The levels are this site's simplification, not an official US scale. They differ mainly in lightness, so they read with any kind of color blindness, and they're named on hover, in the legend, the list and the card.
 
-**Reason colors.** The **Severity | Reason** switch in the legend recolors the map by *why*: War & aggression, Weapons & military threat, Repression & corruption, Armed conflict, Terrorism & militias, Crime, drugs & cyber, or Sanctions evasion (Okabe-Ito colors plus light gray, named in the legend, on hover and in the card).
+**Reasons** are War & aggression, Weapons & military threat, Repression & corruption, Armed conflict, Terrorism & militias, Crime, drugs & cyber, and Sanctions evasion.
 
-- Countries with a program of their own have a hand-set main reason (and sometimes a second, such as Belarus: repression, also war), at full color: `reason` and `reason2` in `SANCTION_COUNTRIES`.
-- Any other country is shown faded, and only when it's clear: at least 25 people and companies based there were listed in the last 5 years, and over 60% of them for one reason (`RECENT_YEARS`, `REASON_MIN_RECENT`, `REASON_MIN_SHARE`). The card words it as "Listed here mostly for", not as a reason for sanctioning the country. Being listed from there under another country's program (Iran, Russia, North Korea, Cuba, Venezuela, Belarus, Syria) counts as **Sanctions evasion** (`FAMILY_REASON`). In October 2026 that gives about 20 countries, such as the UAE, Turkey and Cyprus (evasion), Mexico and Cambodia (crime), and the Maldives (terrorism). Countries whose listings are mostly old, or mixed, get none.
+- Countries with a program have a hand-set main reason (sometimes a second), at full color: `reason` and `reason2` in `SANCTION_COUNTRIES`.
+- Other countries are shown faded, and only when it's clear: at least 25 people, companies and ships based or flagged there were listed in the last 5 years, and over 60% of them for one reason. Once shown, a reason stays until it drops below 50% (or 20 listings), so a country near the line doesn't flicker. The card words it as "Listed here mostly for".
+- Being listed from a country under another country's program (Iran, Russia, North Korea…) counts as **Sanctions evasion**, but never in the place the program is about: Russia-related listings in Ukraine are occupation officials and collaborators, not evasion (`FAMILY_HOME`).
+- Occupied, contested and partly recognized places never get an automatic reason (`NO_AUTO_REASON`: Ukraine, Palestine, Israel, Kosovo, Taiwan, Western Sahara, Northern Cyprus, Somaliland). Their cards still show who is listed.
+- Ships count under the flag they fly, which brings in the "shadow fleet" flags (Panama, Barbados, Liberia, Palau, Cameroon, Comoros, Gabon…). Flags marked false are skipped.
 
 How it stays current:
 
-- **Hand-set:** levels 1 to 3 are in `SANCTION_COUNTRIES` in [`sanctions.js`](sanctions.js), with the date they were last checked (`SANCTIONS_CHECKED`). Change a level or note there.
-- **Read daily:** the deploy workflow runs [`scripts/sanctions.mjs`](scripts/sanctions.mjs), at most once a day. It downloads OFAC's SDN list (about 7 MB), its dated version (about 110 MB, for when each entry was listed) and OFAC's list of programs, and writes `sanctions-data.json`.
-- **Self-correcting, carefully:** a country is lowered to level 4 only when none of its program codes is on the list **and** its program page (`pages`) is gone from OFAC's site, for 7 days in a row (`LOWER_AFTER_DAYS`). A renamed code or a page that is briefly missing changes nothing. Without OFAC's program page, nothing is lowered.
-- **Needs a look:** new program codes or pages, codes gone while the page stays (probably renamed), a program counting down to being lowered, unknown address countries, hand-set levels older than 90 days, or a list older than 3 days. They show on the workflow run, and on the site: the status pill turns amber ("US sanctions · 2 to check", details on hover) and the Key lists them at the top. Nothing moves up a level by itself.
-- Crimea, Sevastopol and the Donetsk and Luhansk regions are drawn from [`regions.js`](regions.js) (Natural Earth shapes). The embargo covers the Russian-occupied parts; the whole regions are shaded.
-- Counts are by address, not nationality, and entries without an address (about 17%) aren't on the map. Not shown: export controls (Commerce), UN and EU sanctions. Not legal advice.
+- **Hand-set:** levels 1 to 3, notes and reasons are in [`sanctions.js`](sanctions.js), with the date they were last checked (`SANCTIONS_CHECKED`, or `checked` on one entry). Each note shows its date in the card.
+- **Read daily:** the deploy workflow runs [`scripts/sanctions.mjs`](scripts/sanctions.mjs), at most once a day. It downloads OFAC's SDN list (about 7 MB), its dated version (about 110 MB) and OFAC's list of programs; [`scripts/sanctions-lib.mjs`](scripts/sanctions-lib.mjs) turns them into `sanctions-data.json`. The page loads that file only when you first open Sanctions or Reasons.
+- **Lowering, carefully:** a country drops to level 4 only when none of its program codes is on the list **and** its program page is gone from OFAC's site, for 7 days in a row. If OFAC's program page can't be read, the last decision stands.
+- **Needs a look:** new program codes or pages, codes gone while the page stays (probably renamed), a program counting down to being lowered, a **burst of listings** (50+ in 30 days and 3 times the usual), unknown countries, hand-set levels older than 90 days, a list older than 3 days, or a source failing for 3 days in a row. They show on the workflow run, and on the site: the status pill turns amber ("US sanctions · 2 to check", details on hover) and the Key lists them at the top. Nothing moves up a level by itself.
+- **What changed:** the Key lists changes since the last daily check: programs ended, reasons that appeared or changed, and the biggest changes in listings.
+- **Tests:** `tests/check.js` checks the rules in `sanctions.js`; [`tests/sanctions-data.mjs`](tests/sanctions-data.mjs) checks the data job against tiny copies of OFAC's files in [`tests/fixtures/`](tests/fixtures).
+- Counts are by address (ships by flag), not nationality; entries with neither aren't on the map. Not shown: UN and EU sanctions. Not legal advice.
 ## Editing
 
 - **Add a place:** add a line to `PLACE_LINES` in `places.js` (`Name;Alias|Country|lat|lng`, with `|r` at the end for a region). Names match case-sensitively on whole words, so leave out places whose names are common words. `places.js` wins when a name is also in `cities.js`.
@@ -119,7 +123,7 @@ How it stays current:
 | `provinces.js` | Provinces of 21 countries (generated) |
 | `sanctions.js` | Sanctions view: hand-set levels, notes, program names, and the self-correcting rules |
 | `regions.js` | Shapes of the embargoed Ukrainian regions (from Natural Earth) |
-| `scripts/` | The generators for `cities.js` and `provinces.js`, the city skip list, and the satellite and sanctions data jobs |
+| `scripts/` | The generators for `cities.js` and `provinces.js`, the city skip list, and the satellite and sanctions data jobs (`sanctions-lib.mjs` holds the sanctions logic) |
 
 To regenerate `provinces.js`, download `ne_10m_admin_1_label_points_details.geojson` from [Natural Earth's repository](https://github.com/nvkelso/natural-earth-vector/tree/master/geojson) and run `powershell -File scripts\build-provinces.ps1 -Points <that file>`. The country list and the suffix-only names are at the top of the script.
 

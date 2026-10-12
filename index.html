@@ -21,7 +21,8 @@
   <div class="status-wrap">
     <div class="view-switch" role="group" aria-label="Map view">
       <button type="button" class="status" data-view="strikes" aria-pressed="true" title="Reported strikes, explosions and fires">Strikes</button>
-      <button type="button" class="status" data-view="sanctions" aria-pressed="false" title="Countries colored by US sanctions">Sanctions</button>
+      <button type="button" class="status" data-view="sanctions" aria-pressed="false" title="Countries colored by how heavy US sanctions are">Sanctions</button>
+      <button type="button" class="status" data-view="reasons" aria-pressed="false" title="Countries colored by why they are under US sanctions">Reasons</button>
     </div>
     <div id="status" class="status" title="Loading the news feed."><span class="dot"></span><span class="label">Loading</span></div>
     <button type="button" class="status reset" data-reset title="Show the whole world (key: 0)">
@@ -38,7 +39,7 @@
   <p class="beta-note"><b>Beta, for testing only.</b> Events are matched automatically from news headlines and may be wrong, incomplete or out of date. Not verified.</p>
 
   <!-- With a mouse, the side panels hide; moving near an edge brings them back. -->
-  <div class="edge edge-left" data-edge="places-panel" aria-hidden="true"><span class="edge-tab">Places</span></div>
+  <div class="edge edge-left" data-edge="places-panel" aria-hidden="true"><span class="edge-tab" data-left-tab>Places</span></div>
   <div class="edge edge-right" data-edge="feed-panel" aria-hidden="true"><span class="edge-tab">Live feed <b data-feed-count></b></span></div>
 
   <aside id="places-panel" class="panel panel-left">
@@ -47,9 +48,10 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
         <span class="sr-only">Collapse featured locations</span>
       </button>
-      <div class="panel-title"><p class="brand">MERIDIAN</p><h2>Featured locations</h2></div>
+      <div class="panel-title"><p class="brand">MERIDIAN</p><h2 data-left-title>Featured locations</h2></div>
     </div>
     <ul class="list" data-places></ul>
+    <div class="s-list-wrap"><input type="search" class="s-search" data-s-search placeholder="Find a country" aria-label="Find a country"><ul class="list" data-s-list></ul></div>
   </aside>
 
   <aside id="feed-panel" class="panel panel-right">
@@ -69,10 +71,12 @@
     <div class="tabs">
       <button type="button" data-tab="places">Places</button>
       <button type="button" data-tab="feed" class="active">Feed</button>
+      <button type="button" data-tab="countries">Countries</button>
     </div>
     <div class="sheet-body" data-sheet-body>
       <div data-sheet="places" hidden><ul class="list" data-places></ul></div>
       <div data-sheet="feed"><div class="filters" data-filters></div><ul class="list" data-feed></ul></div>
+      <div data-sheet="countries" hidden><div class="s-list-wrap"><input type="search" class="s-search" data-s-search placeholder="Find a country" aria-label="Find a country"><ul class="list" data-s-list></ul></div></div>
     </div>
   </section>
 

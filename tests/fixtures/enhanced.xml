@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<sanctionsData xmlns="https://sanctionslistservice.ofac.treas.gov/api/PublicationPreview/exports/ENHANCED_XML">
+  <entities>
+    <entity id="36">
+      <sanctionsLists><sanctionsList refId="1550" id="1" datePublished="1986-07-25">SDN List</sanctionsList></sanctionsLists>
+      <features><feature><value><fromDateBegin>1938-01-01</fromDateBegin></value></feature></features>
+    </entity>
+    <entity id="306">
+      <sanctionsLists><sanctionsList refId="1550" id="2" datePublished="1989-03-30">SDN List</sanctionsList></sanctionsLists>
+    </entity>
+    <entity id="9001">
+      <sanctionsLists><sanctionsList refId="1550" id="3" datePublished="2026-09-30">SDN List</sanctionsList></sanctionsLists>
+      <relationships><relationship datePublished="2026-10-01"/></relationships>
+    </entity>
+    <entity id="9002">
+      <sanctionsLists><sanctionsList refId="1550" id="4" datePublished="2025-01-15">SDN List</sanctionsList></sanctionsLists>
+    </entity>
+  </entities>
+</sanctionsData>

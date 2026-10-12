@@ -112,6 +112,12 @@ function runSanctionChecks(S, countries, regionInfo, regions, mapNames) {
   check(at("Norway") === null, "no dates: none shown", at("Norway"));
   check(at("Puerto Rico") === null, "the US has no reason", at("Puerto Rico"));
   check(S.reasonOf("Cuba", data, S.levelOf("Cuba", data)) === null, "a lowered country loses its hand-set reason", S.reasonOf("Cuba", data, S.levelOf("Cuba", data)));
+  check(S.reasonsOfTags(["RUSSIA-EO14024"], "Ukraine").length === 0 && S.reasonsOfTags(["RUSSIA-EO14024"], "Turkey").join() === "evasion", "a program doesn't count against the place it's about", S.reasonsOfTags(["RUSSIA-EO14024"], "Ukraine"));
+  const occupied = { countries: { Ukraine: { entities: 300, recent: 100, recentReasons: { evasion: 90 } }, Palestine: { entities: 60, recent: 50, recentReasons: { terror: 48 } } } };
+  check(S.reasonOf("Ukraine", occupied, S.levelOf("Ukraine", occupied)) === null && S.reasonOf("Palestine", occupied, S.levelOf("Palestine", occupied)) === null, "occupied and contested places get no automatic reason", null);
+  const published = { auto_reasons: { Chad: { reason: "conflict", share: 0.7, recent: 30 } }, countries: { Mexico: fam.countries.Mexico } };
+  check(S.reasonOf("Chad", published, S.levelOf("Chad", published)).reason === "conflict" && S.reasonOf("Mexico", published, S.levelOf("Mexico", published)) === null, "the published automatic reasons win (they carry the margin)", null);
+  check(S.autoReason("Turkey", { recent: 40, recentReasons: { evasion: 22 } }, { reason: "evasion" }) && !S.autoReason("Turkey", { recent: 40, recentReasons: { evasion: 22 } }, null), "a shown reason is kept down to 50%", null);
 
   // What needs a person's look.
   const fresh = { generated_at: new Date().toISOString(), warnings: [] };

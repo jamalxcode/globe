@@ -10,7 +10,7 @@ const SANCTION_LEVELS = [
   { level: 1, label: "Full embargo", text: "Nearly all trade with the US is banned." },
   { level: 2, label: "Heavy", text: "The government or whole sectors of the economy (banks, energy, technology) are blocked, but it is not a full embargo." },
   { level: 3, label: "Targeted program", text: "The US has a sanctions program for this country, aimed at officials, armed groups, the military or some firms. Ordinary trade is allowed." },
-  { level: 4, label: "No country program", text: "No US sanctions on the country itself. Some people or companies based here may be on the US list (see the card)." },
+  { level: 4, label: "No country program", text: "No US sanctions on the country itself. Some people, companies or ships based or flagged here may still be on the US list." },
 ];
 
 // Why: one main reason per country (the Reason colors). Countries with a program have it set by hand below;
@@ -31,19 +31,21 @@ const SANCTION_REASONS = [
 // (the end of the address). When none of the tags is on the list and the pages are gone, for LOWER_AFTER_DAYS days
 // in a row, the program has ended and the level drops by itself (scripts/sanctions.mjs decides; see levelOf).
 // With no tags (the program's people are listed under other codes), only the pages are checked.
-// eased: sanctions were eased recently and the level may change again.
+// eased: sanctions were eased recently and the level may change again. exportControls: also under broad US export
+// controls on technology (Commerce Department), which the level doesn't include. checked: when the note was last
+// checked, if not SANCTIONS_CHECKED.
 const SANCTION_COUNTRIES = [
-  { country: "Cuba", level: 1, reason: "repression", program: "Cuba Sanctions", tags: ["CUBA", "CUBA-EO14404"], pages: ["cuba-sanctions"],
+  { country: "Cuba", level: 1, exportControls: true, reason: "repression", program: "Cuba Sanctions", tags: ["CUBA", "CUBA-EO14404"], pages: ["cuba-sanctions"],
     note: "Trade embargo since 1962. Also on the State Department's list of state sponsors of terrorism." },
-  { country: "Iran", level: 1, reason: "weapons", reason2: "terror", program: "Iran Sanctions", tags: ["IRAN", "IRAN-EO13902", "IRAN-EO13846", "IRAN-EO13871", "IRAN-EO13876", "IRGC", "IFSR", "IRAN-HR", "IRAN-TRA", "IRAN-CON-ARMS-EO", "HRIT-IR", "CAATSA - IRAN"], pages: ["iran-sanctions"],
+  { country: "Iran", level: 1, exportControls: true, reason: "weapons", reason2: "terror", program: "Iran Sanctions", tags: ["IRAN", "IRAN-EO13902", "IRAN-EO13846", "IRAN-EO13871", "IRAN-EO13876", "IRGC", "IFSR", "IRAN-HR", "IRAN-TRA", "IRAN-CON-ARMS-EO", "HRIT-IR", "CAATSA - IRAN"], pages: ["iran-sanctions"],
     note: "Almost all trade banned, and foreign firms dealing with Iran's oil, banks or shipping can be sanctioned too. State sponsor of terrorism." },
-  { country: "North Korea", level: 1, reason: "weapons", program: "North Korea Sanctions", tags: ["DPRK", "DPRK2", "DPRK3", "DPRK4", "DPRK-NKSPEA"], pages: ["north-korea-sanctions"],
+  { country: "North Korea", level: 1, exportControls: true, reason: "weapons", program: "North Korea Sanctions", tags: ["DPRK", "DPRK2", "DPRK3", "DPRK4", "DPRK-NKSPEA"], pages: ["north-korea-sanctions"],
     note: "Almost all trade banned. State sponsor of terrorism." },
-  { country: "Russia", level: 2, reason: "war", program: "Russian Harmful Foreign Activities; Ukraine-/Russia-related", tags: ["RUSSIA-EO14024", "UKRAINE-EO13660", "UKRAINE-EO13661", "UKRAINE-EO13662", "CAATSA - RUSSIA", "PEESA-EO14039"], pages: ["russian-harmful-foreign-activities-sanctions", "ukraine-russia-related-sanctions"],
+  { country: "Russia", level: 2, exportControls: true, reason: "war", program: "Russian Harmful Foreign Activities; Ukraine-/Russia-related", tags: ["RUSSIA-EO14024", "UKRAINE-EO13660", "UKRAINE-EO13661", "UKRAINE-EO13662", "CAATSA - RUSSIA", "PEESA-EO14039"], pages: ["russian-harmful-foreign-activities-sanctions", "ukraine-russia-related-sanctions"],
     note: "Major banks, the central bank's reserves, energy companies (Rosneft and Lukoil since October 2025), technology exports and many services are blocked. Not a full embargo." },
-  { country: "Venezuela", level: 2, reason: "repression", reason2: "crime", program: "Venezuela-Related Sanctions", tags: ["VENEZUELA", "VENEZUELA-EO13850", "VENEZUELA-EO13884"], pages: ["venezuela-related-sanctions"], eased: true,
+  { country: "Venezuela", level: 2, exportControls: true, reason: "repression", reason2: "crime", program: "Venezuela-Related Sanctions", tags: ["VENEZUELA", "VENEZUELA-EO13850", "VENEZUELA-EO13884"], pages: ["venezuela-related-sanctions"], eased: true,
     note: "The Venezuelan government is still blocked, but since early 2026 general licenses allow most oil trade, including with the state oil company PDVSA." },
-  { country: "Belarus", level: 3, reason: "repression", reason2: "war", program: "Belarus Sanctions", tags: ["BELARUS", "BELARUS-EO14038"], pages: ["belarus-sanctions"], eased: true,
+  { country: "Belarus", level: 3, exportControls: true, reason: "repression", reason2: "war", program: "Belarus Sanctions", tags: ["BELARUS", "BELARUS-EO14038"], pages: ["belarus-sanctions"], eased: true,
     note: "Eased in 2025 and 2026 after prisoner releases: the potash producers, the finance ministry and some banks were removed from the list. Measures over Belarus's support for Russia's war remain." },
   { country: "Syria", level: 3, reason: "repression", reason2: "crime", program: "Promoting Accountability for Assad and Regional Stabilization (PAARSS)", tags: ["PAARSSR-EO13894"], pages: ["paarss"], eased: true,
     note: "The embargo ended in 2025, the Caesar Act was repealed in December 2025 and Syria left the terrorism list in August 2026. The remaining program targets the former Assad government's network and captagon drug traffickers." },
@@ -51,7 +53,7 @@ const SANCTION_COUNTRIES = [
     note: "Aimed at the military government, its leaders and military-owned firms." },
   { country: "Nicaragua", level: 3, reason: "repression", program: "Nicaragua-related Sanctions", tags: ["NICARAGUA", "NICARAGUA-NHRAA"], pages: ["nicaragua-related-sanctions"],
     note: "Aimed at the government's officials and firms linked to them." },
-  { country: "China", level: 3, reason: "weapons", reason2: "repression", program: "Chinese Military Companies; Hong Kong-Related Sanctions", tags: [], pages: ["chinese-military-companies-sanctions", "hong-kong-related-sanctions"],
+  { country: "China", level: 3, exportControls: true, reason: "weapons", reason2: "repression", program: "Chinese Military Companies; Hong Kong-Related Sanctions", tags: [], pages: ["chinese-military-companies-sanctions", "hong-kong-related-sanctions"],
     note: "Americans may not invest in listed Chinese military companies, and officials are sanctioned over Hong Kong. Many Chinese firms are also listed under other programs (Iran, Russia, drugs). Separate export controls (not shown here) restrict advanced technology." },
   { country: "Hong Kong", level: 3, reason: "repression", program: "Hong Kong-Related Sanctions", tags: [], pages: ["hong-kong-related-sanctions"],
     note: "Aimed at officials responsible for curbing Hong Kong's autonomy. Many trading firms here are also listed under other programs (Iran, Russia)." },
@@ -83,16 +85,17 @@ const SANCTION_COUNTRIES = [
     note: "The Zimbabwe program ended in March 2024. The president and some officials remain listed under Global Magnitsky (corruption)." },
 ];
 
-// Regions under a full embargo, drawn from regions.js on top of their country.
+// Regions under a full embargo, drawn from regions.js on top of their country. partial: the embargo covers only the
+// occupied part of the region, so it's drawn hatched.
 const SANCTION_REGION_INFO = {
   "Crimea": { level: 1, reason: "war", program: "Ukraine-/Russia-related (Crimea)", tags: ["UKRAINE-EO13685"], pages: ["ukraine-russia-related-sanctions"],
     note: "Embargo on the Russian-occupied Crimea region since 2014." },
   "Sevastopol": { level: 1, reason: "war", program: "Ukraine-/Russia-related (Crimea)", tags: ["UKRAINE-EO13685"], pages: ["ukraine-russia-related-sanctions"],
     note: "Part of the Crimea embargo since 2014." },
-  "Donetsk region": { level: 1, reason: "war", program: "Ukraine-/Russia-related (DNR and LNR)", tags: ["RUSSIA-EO14065"], pages: ["ukraine-russia-related-sanctions"],
-    note: "Embargo since 2022 on the so-called Donetsk People's Republic: the Russian-occupied part of the region (the whole region is shaded)." },
-  "Luhansk region": { level: 1, reason: "war", program: "Ukraine-/Russia-related (DNR and LNR)", tags: ["RUSSIA-EO14065"], pages: ["ukraine-russia-related-sanctions"],
-    note: "Embargo since 2022 on the so-called Luhansk People's Republic: the Russian-occupied part of the region (the whole region is shaded)." },
+  "Donetsk region": { level: 1, partial: true, reason: "war", program: "Ukraine-/Russia-related (DNR and LNR)", tags: ["RUSSIA-EO14065"], pages: ["ukraine-russia-related-sanctions"],
+    note: "Embargo since 2022 on the so-called Donetsk People's Republic: the Russian-occupied part of the region." },
+  "Luhansk region": { level: 1, partial: true, reason: "war", program: "Ukraine-/Russia-related (DNR and LNR)", tags: ["RUSSIA-EO14065"], pages: ["ukraine-russia-related-sanctions"],
+    note: "Embargo since 2022 on the so-called Luhansk People's Republic: the Russian-occupied part of the region." },
 };
 
 // Plain names for the program codes on OFAC's list (for the card), matched in order.
@@ -146,12 +149,32 @@ const FAMILY_REASON = {
   "Drug trafficking": "crime", "Organized crime": "crime", "Cyber": "crime", "Election interference": "crime",
   "Intellectual property theft": "crime",
 };
-// A country without a program gets a reason only when it's clear: at least REASON_MIN_RECENT people and companies
-// based there were listed in the last RECENT_YEARS years, and more than REASON_MIN_SHARE of them for that reason.
-// Old listings (many date from 2001 to 2010) say little about a country today.
+// The places a program family is about. Listings there under that family are about the place itself (an occupier's
+// officials, the program's own targets), not evasion or support, so they don't count towards its reason: Russia-
+// related listings in Ukraine are mostly occupation officials and collaborators.
+const FAMILY_HOME = {
+  "Russia / Ukraine": ["Russia", "Ukraine", "Crimea"], "Iran": ["Iran"], "North Korea": ["North Korea"],
+  "Cuba": ["Cuba"], "Venezuela": ["Venezuela"], "Belarus": ["Belarus"], "Syria (former Assad network)": ["Syria"],
+};
+
+// Places that never get a reason worked out from their listings: occupied, contested or partly recognized places,
+// where the listings are mostly about the occupier or the conflict, and a label would read as a judgment on the
+// people living there. Their cards still show who is listed.
+const NO_AUTO_REASON = ["Ukraine", "Palestine", "Israel", "Kosovo", "Taiwan", "W. Sahara", "N. Cyprus", "Somaliland"];
+
+// A country without a program gets a reason only when it's clear: at least REASON_MIN_RECENT people, companies and
+// ships based or flagged there were listed in the last RECENT_YEARS years, and more than REASON_MIN_SHARE of them
+// for that reason. Old listings (many date from 2001 to 2010) say little about a country today. Once shown, a reason
+// stays until it falls below REASON_KEEP_SHARE or REASON_KEEP_RECENT, so a country near the line doesn't flicker.
 const RECENT_YEARS = 5;
 const REASON_MIN_RECENT = 25;
 const REASON_MIN_SHARE = 0.6;
+const REASON_KEEP_RECENT = 20;
+const REASON_KEEP_SHARE = 0.5;
+// A burst of listings: at least SURGE_MIN in the last 30 days, and SURGE_FACTOR times the monthly average of the
+// past year. Shown as "needs a look", since the country's level may need to go up.
+const SURGE_MIN = 50;
+const SURGE_FACTOR = 3;
 // A program has to look ended (codes off the list and pages gone) this long before its countries are lowered.
 const LOWER_AFTER_DAYS = 7;
 // Hand-set levels older than this, or a list older than STALE_LIST_DAYS, turn the status pill amber.
@@ -201,24 +224,36 @@ const MeridianSanctions = (() => {
     return r.lowered ? null : r;
   }
 
-  // The reasons a listed person or company counts towards, from its program codes.
-  function reasonsOfTags(tags) {
-    return [...new Set(tags.map((t) => FAMILY_REASON[familyOf(t)]).filter(Boolean))];
+  // The reasons a listed person, company or ship based in `country` counts towards, from its program codes.
+  // A family doesn't count in the places it's about (FAMILY_HOME).
+  function reasonsOfTags(tags, country) {
+    const families = new Set(tags.map(familyOf));
+    return [...new Set([...families].filter((f) => !(FAMILY_HOME[f] || []).includes(country)).map((f) => FAMILY_REASON[f]).filter(Boolean))];
+  }
+
+  // The automatic reason for a country without a program, from its counts in sanctions-data.json, or null.
+  // prev: the reason it had in the last list check ({ reason }), which is kept with a lower bar.
+  // Used by scripts/sanctions.mjs, which publishes the result as auto_reasons.
+  function autoReason(name, counts, prev) {
+    if (NO_AUTO_REASON.includes(name) || !counts || !counts.recentReasons || !counts.recent) return null;
+    const [reason, n] = Object.entries(counts.recentReasons).sort((a, b) => b[1] - a[1])[0] || [];
+    if (!reason) return null;
+    const share = n / counts.recent;
+    const clear = counts.recent >= REASON_MIN_RECENT && share > REASON_MIN_SHARE;
+    const kept = prev && prev.reason === reason && counts.recent >= REASON_KEEP_RECENT && share >= REASON_KEEP_SHARE;
+    return clear || kept ? { reason, share, recent: counts.recent } : null;
   }
 
   // Why a country is sanctioned, for a levelOf/regionLevel result r:
   // - a program country (not lowered): its hand-set reason and second reason;
-  // - otherwise only when clear: of the people and companies based there and listed in the last RECENT_YEARS
-  //   years (at least REASON_MIN_RECENT), more than REASON_MIN_SHARE are listed for one reason.
+  // - otherwise its automatic reason (auto_reasons in sanctions-data.json; see autoReason), if any.
   // Returns { reason, reason2, auto, share, recent } or null.
   function reasonOf(name, data, r) {
     if (!r || r.home) return null;
     if (r.entry && r.entry.reason && r.level <= 3 && !r.lowered) return { reason: r.entry.reason, reason2: r.entry.reason2 || null, auto: false };
-    const counts = data && data.countries ? data.countries[name] : null;
-    if (!counts || !counts.recentReasons || (counts.recent || 0) < REASON_MIN_RECENT) return null;
-    const [reason, n] = Object.entries(counts.recentReasons).sort((a, b) => b[1] - a[1])[0] || [];
-    if (!reason || n / counts.recent <= REASON_MIN_SHARE) return null;
-    return { reason, reason2: null, auto: true, share: n / counts.recent, recent: counts.recent };
+    if (!data || NO_AUTO_REASON.includes(name)) return null;
+    const auto = data.auto_reasons ? data.auto_reasons[name] : autoReason(name, data.countries && data.countries[name], null);
+    return auto ? { reason: auto.reason, reason2: null, auto: true, share: auto.share, recent: auto.recent } : null;
   }
 
   // What a person should look at, shown in the status pill: warnings from the last list check, hand-set levels
@@ -234,5 +269,5 @@ const MeridianSanctions = (() => {
 
   const REASON = Object.fromEntries(SANCTION_REASONS.map((x) => [x.id, x]));
 
-  return { LABEL, REASON, familyOf, families, levelOf, regionLevel, reasonsOfTags, reasonOf, needsCheck, byCountry };
+  return { LABEL, REASON, familyOf, families, levelOf, regionLevel, reasonsOfTags, autoReason, reasonOf, needsCheck, byCountry };
 })();

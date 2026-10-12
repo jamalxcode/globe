@@ -5,6 +5,8 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import vm from "node:vm";
+import { createLib, loadSite } from "../scripts/sanctions-lib.mjs";
+import { runDataChecks } from "./sanctions-data.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (f) => readFileSync(path.join(root, f), "utf8");
@@ -26,17 +28,20 @@ const sanctions = context.runSanctionChecks(
   vm.runInContext("SANCTION_REGION_INFO", context), vm.runInContext("SANCTION_REGIONS", context),
   new Set(countries.map((c) => c.properties.name)),
 );
+// The data job behind sanctions-data.json, against small copies of OFAC's files.
+const sanctionData = runDataChecks(createLib(loadSite(root)), root);
 
 // Every non-English place name must point at a known place.
 const missing = [...matcher.missingI18n];
 
-for (const f of [...headlines.failed, ...events.failed, ...sanctions.failed]) {
+for (const f of [...headlines.failed, ...events.failed, ...sanctions.failed, ...sanctionData.failed]) {
   console.log(`FAIL  ${f.why}\n      ${f.title}\n      expected ${JSON.stringify(f.expected)}\n      got      ${JSON.stringify(f.got)}`);
 }
 if (missing.length) console.log(`FAIL  names-i18n.js names places that don't exist: ${missing.join(", ")}`);
-const failedCount = headlines.failed.length + events.failed.length + sanctions.failed.length + (missing.length ? 1 : 0);
+const failedCount = headlines.failed.length + events.failed.length + sanctions.failed.length + sanctionData.failed.length + (missing.length ? 1 : 0);
 console.log(`headlines: ${headlines.passed} passed, ${headlines.failed.length} failed`);
 console.log(`events: ${events.passed} passed, ${events.failed.length} failed`);
 console.log(`sanctions: ${sanctions.passed} passed, ${sanctions.failed.length} failed`);
-console.log(`${headlines.passed + events.passed + sanctions.passed} passed, ${failedCount} failed`);
+console.log(`sanctions data: ${sanctionData.passed} passed, ${sanctionData.failed.length} failed`);
+console.log(`${headlines.passed + events.passed + sanctions.passed + sanctionData.passed} passed, ${failedCount} failed`);
 process.exit(failedCount ? 1 : 0);

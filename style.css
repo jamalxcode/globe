@@ -356,8 +356,8 @@ body.view-sanctions .country:hover, body.view-sanctions .region:hover { stroke: 
 .lvl { display: inline-block; width: 0.875rem; height: 0.875rem; flex-shrink: 0; border-radius: 0.2rem; border: 1px solid rgb(255 255 255 / 0.25); }
 
 /* Strike panels, legend and sheet step aside; the sanctions legend takes the footer. */
-body.view-sanctions .panel, body.view-sanctions .edge, body.view-sanctions .footer-note,
-body.view-sanctions .sheet, body.view-sanctions .beta-note { display: none !important; }
+body.view-sanctions .panel-right, body.view-sanctions .edge-right, body.view-sanctions .footer-note,
+body.view-sanctions .beta-note { display: none !important; }
 .sanctions-legend { display: none; }
 body.view-sanctions .sanctions-legend {
   position: fixed; left: 0.5rem; right: 0.5rem; bottom: 0.5rem; z-index: 20;
@@ -428,3 +428,48 @@ body.view-sanctions.s-reason .country[data-reason]:not([data-program]) { fill-op
 .key-pop .s-checks { display: flex; flex-direction: column; gap: 0.375rem; padding: 0.5rem 0.625rem; border-left: 3px solid var(--amber); background: var(--surface-2); border-radius: 0.25rem; }
 .key-pop .s-checks li { display: list-item; font-size: 0.75rem; color: var(--fg); }
 .s-count .muted { font-size: 0.8125rem; color: var(--muted); }
+
+/* Countries list (Sanctions view): the left panel and, on phones, the sheet. */
+.s-list-wrap { display: none; flex: 1; min-height: 0; flex-direction: column; }
+body.view-sanctions .s-list-wrap { display: flex; }
+body.view-sanctions [data-places] { display: none; }
+.s-search {
+  margin: 0.5rem 0.75rem; padding: 0.5rem 0.625rem; min-height: 2.25rem;
+  border: 1px solid var(--line); border-radius: calc(var(--radius) - 0.25rem); background: var(--bg); color: var(--fg);
+  font: inherit; font-size: 0.875rem;
+}
+.s-search:focus { outline: 2px solid var(--sky); outline-offset: -1px; }
+.s-head { padding: 0.75rem 0.75rem 0.25rem; font-family: var(--mono); font-size: 0.6875rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--line); }
+.s-row { flex-direction: row; align-items: center; gap: 0.625rem; min-height: 2.5rem; padding: 0.375rem 0.75rem; }
+.s-row .name { display: flex; align-items: center; gap: 0.375rem; font-size: 0.875rem; }
+.s-row .meta { display: block; font-size: 0.75rem; color: var(--muted); }
+body.view-sanctions .country.hl, body.view-sanctions .region.hl { stroke: var(--fg); stroke-width: 2; stroke-dasharray: none; vector-effect: non-scaling-stroke; }
+
+/* Phones: one "Countries" tab in the Sanctions view; the legend sits above the sheet. */
+.tabs [data-tab="countries"] { display: none; }
+body.view-sanctions .tabs { grid-template-columns: 1fr; }
+body.view-sanctions .tabs [data-tab="places"], body.view-sanctions .tabs [data-tab="feed"] { display: none; }
+body.view-sanctions .tabs [data-tab="countries"] { display: block; }
+body.view-sanctions .sheet .note { display: none; }
+@media (max-width: 767px) {
+  body.view-sanctions .sanctions-legend { bottom: 3.25rem; z-index: 19; font-size: 0.6875rem; padding: 0.375rem 0.5rem; }
+  .sanctions-legend ul { gap: 0.2rem 0.625rem; }
+}
+
+/* Partly occupied regions: hatched. */
+body.view-sanctions .region[data-partial] { fill: url(#hatch-level); }
+body.view-sanctions.s-reason .region[data-partial] { fill: url(#hatch-reason); }
+
+/* "+": also under broad export controls. */
+.ec-layer { pointer-events: none; }
+.ec-layer circle { fill: var(--bg); stroke: var(--fg); stroke-width: 1.25; vector-effect: non-scaling-stroke; }
+.ec-layer text { fill: var(--fg); font-family: var(--mono); font-weight: 600; text-anchor: middle; }
+.ec-badge {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 0.875rem; height: 0.875rem; border: 1px solid var(--fg); border-radius: 50%; background: var(--bg);
+  font-family: var(--mono); font-size: 0.6875rem; font-style: normal; font-weight: 600; line-height: 1; color: var(--fg);
+}
+.s-ec { display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.8125rem; color: var(--muted); }
+.s-ec .ec-badge { margin-top: 0.15rem; }
+.key-pop .s-changes { display: flex; flex-direction: column; gap: 0.25rem; }
+.key-pop .s-changes li { display: list-item; font-size: 0.75rem; }
