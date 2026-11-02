@@ -1,0 +1,25 @@
+# GitHub pauses scheduled workflows in a repository with no commits for 60 days, which would stop the hourly
+# satellite and daily sanctions refresh. Once a month this re-enables the scheduled workflows through the API,
+# which resets that 60-day count without making a commit.
+name: Keep scheduled runs alive
+
+on:
+  schedule:
+    - cron: "37 5 1 * *"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Re-enable the scheduled workflows
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for wf in deploy.yml keepalive.yml; do
+            gh api -X PUT "repos/${{ github.repository }}/actions/workflows/$wf/enable"
+          done

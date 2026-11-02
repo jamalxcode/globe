@@ -26,7 +26,7 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -34,6 +34,16 @@ jobs:
           node-version: 22
       - name: Check headline rules
         run: node tests/run.mjs
+      # The page itself, in a real browser with a made-up feed (tests/smoke.mjs). Only when the code changed:
+      # the hourly data refresh runs the same code, so it skips the browser install.
+      - name: Install a browser
+        if: github.event_name != 'schedule'
+        run: |
+          npm install --no-save --no-package-lock playwright@1.63.0
+          npx playwright install --with-deps chromium
+      - name: Check the page in a browser
+        if: github.event_name != 'schedule'
+        run: node tests/smoke.mjs
 
   deploy:
     needs: test
@@ -51,7 +61,7 @@ jobs:
       - name: Assemble site
         run: |
           mkdir _site
-          cp -r index.html style.css favicon.svg app.js extract.js events.js names-i18n.js places.js cities.js provinces.js regions.js sanctions.js vendor _site/
+          cp -r index.html style.css favicon.svg ui extract.js events.js names-i18n.js places.js cities.js provinces.js regions.js sanctions.js vendor _site/
       - uses: actions/setup-node@v5
         with:
           node-version: 22

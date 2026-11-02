@@ -1,5 +1,5 @@
 // Turns news items into "mentions": one headline that names a kind of strike and a known place.
-// Shared by the page (app.js) and the archiver (scripts/archive.mjs), so both apply the same rules.
+// Shared by the page (ui/feed.js) and the tests (tests/run.mjs), so both apply the same rules.
 // Needs places.js and cities.js loaded first, and a global d3 with geoCentroid and geoArea.
 var MeridianExtract = (function () {
   "use strict";

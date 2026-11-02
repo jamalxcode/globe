@@ -20,6 +20,8 @@ It's a static page: no server, build step, API keys or sign-up. GitHub Pages ser
 
 The map uses the **Equal Earth** projection, which keeps every country at its true relative size. On the usual Mercator map Europe, Russia and Greenland are stretched and Africa, South America and South Asia are shrunk. Drag to pan, scroll or pinch to zoom; **Full view** (or the `0` key) goes back to the whole world. **Key** explains every symbol.
 
+**Shareable links:** the address always describes what's on screen, so copying it shares that view. `#e=…` opens an event, `#c=…` a country and `#p=…` a featured place; otherwise `#m=lng,lat,zoom` keeps the map position. `v=sanctions` or `v=reasons` and `w=6` (hours) add the view and time range when they aren't the defaults. A shared event that has since left the 48-hour feed opens the map without it.
+
 ### Markers
 
 - **Sources:** one source is a hollow ring (and a dashed disc); two or more independent sources is a solid dot (and a solid disc). Shape carries the meaning, so it reads without color. The colors, orange and pink from the [Okabe-Ito palette](https://jfly.uni-koeln.de/color/), also stay distinct with red-green color blindness. The feed spells out the count ("1 source", "3 sources").
@@ -53,11 +55,13 @@ Hover over the pill for the feed's age and when Bluesky was last checked.
 
 ## Tests and publishing
 
-[`tests/headlines.json`](tests/headlines.json) holds real and typical headlines (English, Arabic, Russian, Ukrainian) with the right answer: what kind of event, where, what was hit, when, or "not an event". It includes every mistake that has been fixed (the old Kuwait story, "Russia says…", the Cardón refinery fire…), so they can't come back. [`tests/events.json`](tests/events.json) checks the event logic with small scenarios: owners and reprints counting once, combined attacks, weak reports leaving the map after 6 hours, satellite matches and target votes. On every push, [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) runs `node tests/run.mjs`; only if every case passes does it publish the site to GitHub Pages. If a case fails, the last good version stays live and GitHub emails the failure. When a rule is fixed, add its headline as a new case.
+[`tests/headlines.json`](tests/headlines.json) holds real and typical headlines (English, Arabic, Russian, Ukrainian) with the right answer: what kind of event, where, what was hit, when, or "not an event". It includes every mistake that has been fixed (the old Kuwait story, "Russia says…", the Cardón refinery fire…), so they can't come back. [`tests/events.json`](tests/events.json) checks the event logic with small scenarios: owners and reprints counting once, combined attacks, weak reports leaving the map after 6 hours, satellite matches and target votes. On every push, [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) runs `node tests/run.mjs` and then [`tests/smoke.mjs`](tests/smoke.mjs), which opens the page in a headless Chromium with a made-up feed and checks that markers and feed rows appear, an event's card opens, its address reopens it in a new tab, keyboard focus survives the 10-second refresh, non-web links aren't clickable, and the Sanctions view opens. Only if everything passes does it publish the site to GitHub Pages (the hourly data refresh skips the browser check, since the code hasn't changed). If a case fails, the last good version stays live and GitHub emails the failure. When a rule is fixed, add its headline as a new case.
 
 ### Self-audits
 
-Every so often a random sample of real headlines from the live feeds is checked by hand: ones the map accepted (right kind, place, target?) and ones it rejected despite strike words (anything missed?). Every mistake found is fixed and added to `tests/headlines.json`. All are now tests.
+Every Monday [`.github/workflows/audit.yml`](.github/workflows/audit.yml) runs [`scripts/audit.mjs`](scripts/audit.mjs): Claude checks a random sample of 40 accepted and 40 rejected live headlines (English only for the rejected sample) against what the rules decided, and if it suspects mistakes the workflow opens an issue listing each one with a ready-to-paste `tests/headlines.json` case. Claude's verdicts are a second opinion for a person to check; nothing on the map changes by itself. It needs an Anthropic API key stored as the repository secret `ANTHROPIC_API_KEY` (costs a few cents a week); without it the run is skipped.
+
+Before that, samples were checked by hand: ones the map accepted (right kind, place, target?) and ones it rejected despite strike words (anything missed?). Every mistake found is fixed and added to `tests/headlines.json`. All are now tests.
 
 | Audit | Checked | Accepted right | Missed in rejected sample |
 |---|---|---|---|
@@ -69,7 +73,7 @@ Every so often a random sample of real headlines from the live feeds is checked 
 1. Request a free key at https://firms.modaps.eosdis.nasa.gov/api/map_key/ (email only; it arrives by email).
 2. Add it to this repository: **Settings → Secrets and variables → Actions → New repository secret**, name `FIRMS_MAP_KEY`. Or run `gh secret set FIRMS_MAP_KEY -R jamalxcode/globe` and paste the key when asked.
 
-The next hourly run (or **Actions → Test and deploy → Run workflow**) publishes `fires.json`. GitHub pauses scheduled workflows in a repository with no commits for 60 days; if that happens, the satellite data stops refreshing until the next push or a manual run.
+The next hourly run (or **Actions → Test and deploy → Run workflow**) publishes `fires.json`. GitHub pauses scheduled workflows in a repository with no commits for 60 days; [`.github/workflows/keepalive.yml`](.github/workflows/keepalive.yml) re-enables them once a month through the API so that doesn't happen. If it ever does, a push or a manual run starts them again.
 
 ## Sanctions view
 
@@ -114,7 +118,7 @@ How it stays current:
 |---|---|
 | `index.html` | Page layout |
 | `style.css` | Look (same palette and fonts as the original Meridian) |
-| `app.js` | Loads the feed, merges reports into events, draws the map and panels |
+| `ui/` | The page's code, as plain scripts loaded in order: `core.js` (constants, state, helpers), `feed.js` (loading the feeds, headlines into events), `map.js` (markers, groups, zoom), `panels.js` (side panels, feed list, info card), `sanctions-view.js`, `main.js` (view switch, Key, input, shareable links, start-up) |
 | `extract.js` | The rules that turn a headline into a report: kind, place, target, time, wire credit (English, Arabic, Russian, Ukrainian) |
 | `events.js` | Reports into events: merging, combined attacks, independent sources, weak reports, satellite heat |
 | `names-i18n.js` | Arabic, Russian and Ukrainian names for places in the other lists |
@@ -123,7 +127,7 @@ How it stays current:
 | `provinces.js` | Provinces of 21 countries (generated) |
 | `sanctions.js` | Sanctions view: hand-set levels, notes, program names, and the self-correcting rules |
 | `regions.js` | Shapes of the embargoed Ukrainian regions (from Natural Earth) |
-| `scripts/` | The generators for `cities.js` and `provinces.js`, the city skip list, and the satellite and sanctions data jobs (`sanctions-lib.mjs` holds the sanctions logic) |
+| `scripts/` | The generators for `cities.js` and `provinces.js`, the city skip list, the satellite and sanctions data jobs (`sanctions-lib.mjs` holds the sanctions logic), and the weekly headline audit (`audit.mjs`) |
 
 To regenerate `provinces.js`, download `ne_10m_admin_1_label_points_details.geojson` from [Natural Earth's repository](https://github.com/nvkelso/natural-earth-vector/tree/master/geojson) and run `powershell -File scripts\build-provinces.ps1 -Points <that file>`. The country list and the suffix-only names are at the top of the script.
 
