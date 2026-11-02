@@ -14,6 +14,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
   <link rel="stylesheet" href="style.css">
+  <!-- The country shapes are the biggest download; start fetching them while the scripts load. -->
+  <link rel="preload" href="vendor/countries-50m.json" as="fetch" crossorigin>
 </head>
 <body>
   <div id="map" aria-label="World map of reported strikes and explosions"></div>
@@ -36,7 +38,7 @@
   </div>
   <div id="key" class="key-pop" hidden></div>
 
-  <p class="beta-note"><b>Beta, for testing only.</b> Events are matched automatically from news headlines and may be wrong, incomplete or out of date. Not verified.</p>
+  <p class="beta-note"><b>Personal experiment.</b> Events are matched automatically from public news headlines and may be wrong, incomplete or out of date. Not verified, not news, not advice. Provided as is, with no responsibility for its content or its use.</p>
 
   <!-- With a mouse, the side panels hide; moving near an edge brings them back. -->
   <div class="edge edge-left" data-edge="places-panel" aria-hidden="true"><span class="edge-tab" data-left-tab>Places</span></div>
@@ -86,7 +88,7 @@
       <span class="key"><i class="multi"></i>2+ independent sources</span>
       <span>Icons: see Key at the top</span>
     </p>
-    <p>Unverified news and social media reports. Not for operational use.</p>
+    <p>A personal experiment: unverified news and social media reports, provided as is. Not for operational use.</p>
   </div>
 
   <div class="sanctions-legend">
@@ -96,18 +98,24 @@
 
   <article id="card" class="card" hidden></article>
 
-  <!-- Local copies (d3 7.9.0, topojson 3.0.2), so the map doesn't depend on a CDN being up. -->
-  <script src="vendor/d3.min.js"></script>
-  <script src="vendor/topojson.min.js"></script>
-  <script src="provinces.js"></script>
-  <script src="cities.js"></script>
-  <script src="places.js"></script>
-  <script src="names-i18n.js"></script>
-  <script src="regions.js"></script>
-  <script src="sanctions.js"></script>
-  <script src="extract.js"></script>
-  <script src="events.js"></script>
-  <script src="app.js"></script>
+  <!-- Local copies (d3 7.9.0, topojson 3.0.2), so the map doesn't depend on a CDN being up. "defer": the page
+       shows while they download, and they still run in this order. -->
+  <script defer src="vendor/d3.min.js"></script>
+  <script defer src="vendor/topojson.min.js"></script>
+  <script defer src="provinces.js"></script>
+  <script defer src="cities.js"></script>
+  <script defer src="places.js"></script>
+  <script defer src="names-i18n.js"></script>
+  <script defer src="regions.js"></script>
+  <script defer src="sanctions.js"></script>
+  <script defer src="extract.js"></script>
+  <script defer src="events.js"></script>
+  <script defer src="ui/core.js"></script>
+  <script defer src="ui/feed.js"></script>
+  <script defer src="ui/map.js"></script>
+  <script defer src="ui/panels.js"></script>
+  <script defer src="ui/sanctions-view.js"></script>
+  <script defer src="ui/main.js"></script>
 <!-- GoatCounter analytics (not loaded on localhost; paths are prefixed with the host so all *.sala.company apps share one dashboard) -->
 <script>
   (function () {

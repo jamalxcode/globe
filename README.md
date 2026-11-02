@@ -2,7 +2,7 @@
 
 A live world map of reported strikes, explosions, industrial fires, wildfires and environmental incidents. A hollow orange ring marks a report from one source; a solid pink dot marks two or more independent sources. Reports are news headlines and social posts, not confirmed facts.
 
-**Beta, for testing only:** events are matched automatically from real news headlines and may be wrong, incomplete or out of date. The page says so at the top left.
+**A personal experiment, provided as is.** Events are matched automatically from public news headlines and may be wrong, incomplete or out of date. Nothing here is verified, and it isn't news, advice or a statement of fact about any event, country or party. The author takes no responsibility for its content or for any use of it. The page says so on screen, and asks search engines not to list it. The code is under the [MIT License](LICENSE), provided "as is", without warranty of any kind.
 
 It's a static page: no server, build step, API keys or sign-up. GitHub Pages serves the files and everything else happens in the visitor's browser.
 
@@ -19,6 +19,8 @@ It's a static page: no server, build step, API keys or sign-up. GitHub Pages ser
 ## The map
 
 The map uses the **Equal Earth** projection, which keeps every country at its true relative size. On the usual Mercator map Europe, Russia and Greenland are stretched and Africa, South America and South Asia are shrunk. Drag to pan, scroll or pinch to zoom; **Full view** (or the `0` key) goes back to the whole world. **Key** explains every symbol.
+
+**Shareable links:** the address always describes what's on screen, so copying it shares that view. `#e=…` opens an event, `#c=…` a country and `#p=…` a featured place; otherwise `#m=lng,lat,zoom` keeps the map position. `v=sanctions` or `v=reasons` and `w=6` (hours) add the view and time range when they aren't the defaults. A shared event that has since left the 48-hour feed opens the map without it.
 
 ### Markers
 
@@ -53,7 +55,7 @@ Hover over the pill for the feed's age and when Bluesky was last checked.
 
 ## Tests and publishing
 
-[`tests/headlines.json`](tests/headlines.json) holds real and typical headlines (English, Arabic, Russian, Ukrainian) with the right answer: what kind of event, where, what was hit, when, or "not an event". It includes every mistake that has been fixed (the old Kuwait story, "Russia says…", the Cardón refinery fire…), so they can't come back. [`tests/events.json`](tests/events.json) checks the event logic with small scenarios: owners and reprints counting once, combined attacks, weak reports leaving the map after 6 hours, satellite matches and target votes. On every push, [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) runs `node tests/run.mjs`; only if every case passes does it publish the site to GitHub Pages. If a case fails, the last good version stays live and GitHub emails the failure. When a rule is fixed, add its headline as a new case.
+[`tests/headlines.json`](tests/headlines.json) holds real and typical headlines (English, Arabic, Russian, Ukrainian) with the right answer: what kind of event, where, what was hit, when, or "not an event". It includes every mistake that has been fixed (the old Kuwait story, "Russia says…", the Cardón refinery fire…), so they can't come back. [`tests/events.json`](tests/events.json) checks the event logic with small scenarios: owners and reprints counting once, combined attacks, weak reports leaving the map after 6 hours, satellite matches and target votes. On every push, [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) runs `node tests/run.mjs` and then [`tests/smoke.mjs`](tests/smoke.mjs), which opens the page in a headless Chromium with a made-up feed and checks that markers and feed rows appear, an event's card opens, its address reopens it in a new tab, keyboard focus survives the 10-second refresh, non-web links aren't clickable, and the Sanctions view opens. Only if everything passes does it publish the site to GitHub Pages (the hourly data refresh skips the browser check, since the code hasn't changed). If a case fails, the last good version stays live and GitHub emails the failure. When a rule is fixed, add its headline as a new case.
 
 ### Self-audits
 
@@ -69,7 +71,7 @@ Every so often a random sample of real headlines from the live feeds is checked 
 1. Request a free key at https://firms.modaps.eosdis.nasa.gov/api/map_key/ (email only; it arrives by email).
 2. Add it to this repository: **Settings → Secrets and variables → Actions → New repository secret**, name `FIRMS_MAP_KEY`. Or run `gh secret set FIRMS_MAP_KEY -R jamalxcode/globe` and paste the key when asked.
 
-The next hourly run (or **Actions → Test and deploy → Run workflow**) publishes `fires.json`. GitHub pauses scheduled workflows in a repository with no commits for 60 days; if that happens, the satellite data stops refreshing until the next push or a manual run.
+The next hourly run (or **Actions → Test and deploy → Run workflow**) publishes `fires.json`. GitHub pauses scheduled workflows in a repository with no commits for 60 days; [`.github/workflows/keepalive.yml`](.github/workflows/keepalive.yml) re-enables them once a month through the API so that doesn't happen. If it ever does, a push or a manual run starts them again.
 
 ## Sanctions view
 
@@ -114,7 +116,7 @@ How it stays current:
 |---|---|
 | `index.html` | Page layout |
 | `style.css` | Look (same palette and fonts as the original Meridian) |
-| `app.js` | Loads the feed, merges reports into events, draws the map and panels |
+| `ui/` | The page's code, as plain scripts loaded in order: `core.js` (constants, state, helpers), `feed.js` (loading the feeds, headlines into events), `map.js` (markers, groups, zoom), `panels.js` (side panels, feed list, info card), `sanctions-view.js`, `main.js` (view switch, Key, input, shareable links, start-up) |
 | `extract.js` | The rules that turn a headline into a report: kind, place, target, time, wire credit (English, Arabic, Russian, Ukrainian) |
 | `events.js` | Reports into events: merging, combined attacks, independent sources, weak reports, satellite heat |
 | `names-i18n.js` | Arabic, Russian and Ukrainian names for places in the other lists |
@@ -123,7 +125,7 @@ How it stays current:
 | `provinces.js` | Provinces of 21 countries (generated) |
 | `sanctions.js` | Sanctions view: hand-set levels, notes, program names, and the self-correcting rules |
 | `regions.js` | Shapes of the embargoed Ukrainian regions (from Natural Earth) |
-| `scripts/` | The generators for `cities.js` and `provinces.js`, the city skip list, and the satellite and sanctions data jobs (`sanctions-lib.mjs` holds the sanctions logic) |
+| `scripts/` | The generators for `cities.js` and `provinces.js`, the city skip list, the satellite and sanctions data jobs (`sanctions-lib.mjs` holds the sanctions logic) |
 
 To regenerate `provinces.js`, download `ne_10m_admin_1_label_points_details.geojson` from [Natural Earth's repository](https://github.com/nvkelso/natural-earth-vector/tree/master/geojson) and run `powershell -File scripts\build-provinces.ps1 -Points <that file>`. The country list and the suffix-only names are at the top of the script.
 

@@ -2,11 +2,13 @@
 # Pages, with fresh satellite heat data (fires.json) when the FIRMS_MAP_KEY secret is set, and OFAC's sanctions
 # list counted per country (sanctions-data.json, refreshed daily).
 # If a check fails, nothing is published: the last good version stays live and GitHub emails the failure.
+# On a pull request only the checks run, so a problem shows on the pull request before anything is merged.
 name: Test and deploy
 
 on:
   push:
     branches: [main]
+  pull_request:
   # Hourly refresh of the satellite data (NASA updates it every few hours). GitHub's schedule can run late;
   # that's fine here.
   schedule:
@@ -18,15 +20,16 @@ permissions:
   pages: write
   id-token: write
 
-# A newer push replaces a deploy that is still waiting.
+# A newer push replaces a deploy that is still waiting. Pull requests get their own group, so checking one
+# never cancels a deploy.
 concurrency:
-  group: pages
+  group: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.ref) || 'pages' }}
   cancel-in-progress: true
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -34,9 +37,20 @@ jobs:
           node-version: 22
       - name: Check headline rules
         run: node tests/run.mjs
+      # The page itself, in a real browser with a made-up feed (tests/smoke.mjs). Only when the code changed:
+      # the hourly data refresh runs the same code, so it skips the browser install.
+      - name: Install a browser
+        if: github.event_name != 'schedule'
+        run: |
+          npm install --no-save --no-package-lock playwright@1.63.0
+          npx playwright install --with-deps chromium
+      - name: Check the page in a browser
+        if: github.event_name != 'schedule'
+        run: node tests/smoke.mjs
 
   deploy:
     needs: test
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment:
@@ -51,7 +65,7 @@ jobs:
       - name: Assemble site
         run: |
           mkdir _site
-          cp -r index.html style.css favicon.svg app.js extract.js events.js names-i18n.js places.js cities.js provinces.js regions.js sanctions.js vendor _site/
+          cp -r index.html style.css favicon.svg ui extract.js events.js names-i18n.js places.js cities.js provinces.js regions.js sanctions.js vendor _site/
       - uses: actions/setup-node@v5
         with:
           node-version: 22
