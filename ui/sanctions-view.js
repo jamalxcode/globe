@@ -173,8 +173,8 @@ function renderSanctionLegend() {
   document.querySelectorAll("[data-s-legend]").forEach((el) => { el.innerHTML = items + ec; });
   document.querySelectorAll("[data-s-legend-note]").forEach((el) => {
     el.innerHTML = reason
-      ? `<b>Beta.</b> Faded: no country program, but most of those listed there in the last ${RECENT_YEARS} years share one reason. Not legal advice.`
-      : `<b>Beta.</b> US sanctions, simplified, and may be out of date. Click a country for details. Not legal advice.`;
+      ? `<b>Personal experiment, provided as is.</b> Faded: no country program, but most of those listed there in the last ${RECENT_YEARS} years share one reason. Not legal advice.`
+      : `<b>Personal experiment, provided as is.</b> US sanctions, simplified, and may be out of date. Click a country for details. Not legal advice.`;
   });
 }
 
