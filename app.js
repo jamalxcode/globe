@@ -109,6 +109,34 @@ function esc(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+// Only web links are clickable: a feed item with a javascript: or data: address gets no link at all.
+function safeUrl(u) {
+  return /^https?:\/\//i.test(String(u || "")) ? String(u) : null;
+}
+
+// Replaces a list's contents only when they changed, and puts keyboard focus back on the same row or chip
+// afterwards, so the 10-second refresh doesn't throw a keyboard or screen-reader user back to the top.
+const lastHtml = new WeakMap();
+function setHTML(el, html) {
+  if (lastHtml.get(el) === html) return;
+  const active = document.activeElement;
+  const key = active && el.contains(active) ? focusKey(active) : null;
+  el.innerHTML = html;
+  lastHtml.set(el, html);
+  if (key) {
+    const again = el.querySelector(key);
+    if (again) again.focus({ preventScroll: true });
+  }
+}
+function focusKey(node) {
+  const b = node.closest("[data-row-id], [data-type], [data-window], [data-corr]");
+  if (!b) return null;
+  for (const a of ["data-row-id", "data-type", "data-window"]) {
+    if (b.hasAttribute(a)) return `[${a}="${CSS.escape(b.getAttribute(a))}"]`;
+  }
+  return "[data-corr]";
+}
+
 function relativeTime(iso, now) {
   const seconds = Math.max(0, Math.round((now - Date.parse(iso)) / 1000));
   if (seconds < 10) return "just now";
@@ -245,36 +273,51 @@ async function loadFires() {
 
 // Bluesky's public API allows browser requests, so between feed builds the page asks the
 // accounts the feed lists in data.live for their newest posts (same as news.sala.company).
+// Every open tab asks Bluesky, so the page is polite about it: a few accounts at a time, and when Bluesky
+// says "too many requests" (429) it waits (Retry-After, or 5 minutes) before asking again.
+const LIVE_PARALLEL = 4;
+const LIVE_BACKOFF_MS = 5 * 60e3;
 let livePolling = false;
+let liveResumeAt = 0;
 async function pollLive() {
-  if (!state.data || !state.data.live || livePolling || document.hidden) return;
+  if (!state.data || !state.data.live || livePolling || document.hidden || Date.now() < liveResumeAt) return;
   livePolling = true;
   const cutoff = Date.now() - 48 * 3600e3;
   let added = 0;
+  const queue = state.data.live.slice();
+  const worker = async () => {
+    for (let src; (src = queue.shift()) && Date.now() >= liveResumeAt;) await pollAccount(src);
+  };
+  const pollAccount = async (src) => {
+    try {
+      const u = "https://public.api.bsky.app/xrpc/app.bsky.feed.getAuthorFeed?filter=posts_no_replies&limit=10&actor=" + encodeURIComponent(src.handle);
+      const res = await fetch(u);
+      if (res.status === 429) {
+        const wait = Number(res.headers.get("Retry-After")) * 1000;
+        liveResumeAt = Date.now() + (wait > 0 ? Math.min(wait, 30 * 60e3) : LIVE_BACKOFF_MS);
+        return;
+      }
+      if (!res.ok) return;
+      const { feed } = await res.json();
+      for (const it of feed || []) {
+        if (it.reason) continue; // repost
+        const p = it.post;
+        const text = ((p.record && p.record.text) || "").trim();
+        const rkey = p.uri.split("/").pop();
+        const id = "bsky-" + rkey;
+        const published = new Date(p.record.createdAt).toISOString();
+        if (!text || state.live.has(id) || Date.parse(published) < cutoff) continue;
+        let url = `https://bsky.app/profile/${src.handle}/post/${rkey}`;
+        const ext = p.embed && p.embed.external;
+        if (ext && /^https?:/.test(ext.uri)) url = ext.uri;
+        const title = text.split("\n")[0].slice(0, 300);
+        state.live.set(id, { id, title, url, source: src.name, category: src.category, published, social: true });
+        added++;
+      }
+    } catch { /* one account failing shouldn't stop the rest */ }
+  };
   try {
-    await Promise.all(state.data.live.map(async (src) => {
-      try {
-        const u = "https://public.api.bsky.app/xrpc/app.bsky.feed.getAuthorFeed?filter=posts_no_replies&limit=10&actor=" + encodeURIComponent(src.handle);
-        const res = await fetch(u);
-        if (!res.ok) return;
-        const { feed } = await res.json();
-        for (const it of feed || []) {
-          if (it.reason) continue; // repost
-          const p = it.post;
-          const text = ((p.record && p.record.text) || "").trim();
-          const rkey = p.uri.split("/").pop();
-          const id = "bsky-" + rkey;
-          const published = new Date(p.record.createdAt).toISOString();
-          if (!text || state.live.has(id) || Date.parse(published) < cutoff) continue;
-          let url = `https://bsky.app/profile/${src.handle}/post/${rkey}`;
-          const ext = p.embed && p.embed.external;
-          if (ext && /^https?:/.test(ext.uri)) url = ext.uri;
-          const title = text.split("\n")[0].slice(0, 300);
-          state.live.set(id, { id, title, url, source: src.name, category: src.category, published, social: true });
-          added++;
-        }
-      } catch { /* one account failing shouldn't stop the rest */ }
-    }));
+    await Promise.all(Array.from({ length: LIVE_PARALLEL }, worker));
   } finally {
     livePolling = false;
   }
@@ -391,7 +434,7 @@ const zoom = d3.zoom()
     if (Math.abs(Math.log(k / (clusterK || k))) > 0.25) drawEvents();
     else rescale();
   })
-  .on("end", () => { if (k !== clusterK) drawEvents(); });
+  .on("end", () => { if (k !== clusterK) drawEvents(); writeHash(); });
 svg.call(zoom).on("dblclick.zoom", null);
 
 function layout() {
@@ -700,7 +743,7 @@ function renderPlaces() {
       <span><span class="name">${esc(p.name)}</span><span class="coords">${p.lat.toFixed(1)}°, ${p.lng.toFixed(1)}°</span></span>
     </button></li>`;
   }).join("");
-  document.querySelectorAll("[data-places]").forEach((el) => { el.innerHTML = html; });
+  document.querySelectorAll("[data-places]").forEach((el) => setHTML(el, html));
 }
 
 function renderFilters() {
@@ -708,7 +751,7 @@ function renderFilters() {
   const corr = `<button type="button" class="chip corr" data-corr aria-pressed="${state.corroboratedOnly}" title="Only events reported by two or more independent sources">2+ sources only</button>`;
   const wins = WINDOWS.map((w) => `<button type="button" class="chip win" data-window="${w.h}" aria-pressed="${state.windowH === w.h}" title="Last ${w.long}">${w.label}</button>`).join("");
   const html = types + corr + '<span class="sep"></span>' + wins;
-  document.querySelectorAll("[data-filters]").forEach((el) => { el.innerHTML = html; });
+  document.querySelectorAll("[data-filters]").forEach((el) => setHTML(el, html));
 }
 
 function renderFeed() {
@@ -736,7 +779,7 @@ function renderFeed() {
       </button></li>`;
     }).join("");
   }
-  document.querySelectorAll("[data-feed]").forEach((el) => { el.innerHTML = html; });
+  document.querySelectorAll("[data-feed]").forEach((el) => setHTML(el, html));
   const count = document.querySelector("[data-feed-count]");
   if (count) count.textContent = state.data && matcher ? `· ${list.length}` : "";
 }
@@ -777,7 +820,7 @@ for (const panel of document.querySelectorAll(".panel")) {
 function renderCard() {
   const card = document.getElementById("card");
   const sel = state.selection;
-  if (!state.cardOn || !sel) { card.hidden = true; return; }
+  if (!state.cardOn || !sel) { card.hidden = true; writeHash(); return; }
   const close = `<button type="button" class="icon-btn" data-close aria-label="Close">${ICON_X}</button>`;
   if (sel.kind === "country") {
     card.innerHTML = sanctionCardHtml(sel.id, close);
@@ -792,8 +835,12 @@ function renderCard() {
     if (!ev) { card.hidden = true; return; }
     const corroborated = ev.status === "corroborated";
     const now = Date.now();
-    const reports = ev.reports.slice(0, 8).map((r) => `<li><a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${ICON_EXT}
-      <span><span class="src">${esc(r.source)}${r.social ? " · social" : ""}${r.wire && r.wire !== r.source ? ` · credits ${esc(r.wire)}` : ""} · ${relativeTime(r.published, now)}</span><span class="ttl">${markTerms(r.title, r.why ? [r.why.type, r.why.place, r.why.target] : [])}</span></span></a></li>`).join("");
+    const reports = ev.reports.slice(0, 8).map((r) => {
+      const url = safeUrl(r.url);
+      const inner = `${ICON_EXT}
+      <span><span class="src">${esc(r.source)}${r.social ? " · social" : ""}${r.wire && r.wire !== r.source ? ` · credits ${esc(r.wire)}` : ""} · ${relativeTime(r.published, now)}</span><span class="ttl">${markTerms(r.title, r.why ? [r.why.type, r.why.place, r.why.target] : [])}</span></span>`;
+      return url ? `<li><a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${inner}</a></li>` : `<li><span class="nolink">${inner}</span></li>`;
+    }).join("");
     const target = ev.target ? `<p class="hit-target">${targetIcon(ev.target)}<span>Hit: ${esc(TARGETS[ev.target].label)} <span class="muted">(from the headlines)</span></span></p>` : "";
     const sourcesLabel = ev.source_count === 1 ? "1 source" : `${ev.source_count} independent sources`;
     card.innerHTML = `<div class="top"><div><p class="kicker ${corroborated ? "multi" : "one"}">${typeIcons(ev)}${typeLabel(ev)}${ev.combined ? " (combined attack)" : ""} · ${sourcesLabel}</p><h2>${esc(ev.location_name)}</h2></div>${close}</div>
@@ -804,6 +851,7 @@ function renderCard() {
       <a class="search" href="${esc(xSearchUrl(ev.location_name, ev.event_type))}" target="_blank" rel="noopener noreferrer">Latest posts on X →</a></div>`;
   }
   card.hidden = false;
+  writeHash();
 }
 
 // A headline with the words the rules matched highlighted (escaped; first match of each term).
@@ -1101,7 +1149,7 @@ function renderSanctionList() {
       ${swatch}<span><span class="name">${esc(x.label)}${x.r.entry && x.r.entry.exportControls && !x.r.lowered ? ` ${EC_BADGE}` : ""}</span>${meta ? `<span class="meta">${esc(meta)}</span>` : ""}</span></button></li>`;
   }
   if (!rows.length) html = `<li class="empty">No country matches “${esc(sanctionQuery)}”.</li>`;
-  document.querySelectorAll("[data-s-list]").forEach((el) => { el.innerHTML = html; });
+  document.querySelectorAll("[data-s-list]").forEach((el) => setHTML(el, html));
 }
 
 // Zooms to a country (or region) and opens its card.
@@ -1297,6 +1345,57 @@ document.addEventListener("keydown", (e) => {
   if ((e.key === "0" || e.key === "Home") && !e.target.closest("input, textarea")) resetView();
 });
 
+// ---------- shareable links ----------
+
+// The address always describes what's on screen, so copying it shares this exact view:
+//   #e=<event id>  #c=<country>  #p=<featured place>   the open card
+//   #m=<lng>,<lat>,<zoom>                              otherwise, the map position (when zoomed in)
+//   v=sanctions|reasons  w=<hours>                     the view and time range, when not the defaults
+const HASH_KIND = { event: "e", country: "c", place: "p" };
+let hashApplied = false; // a pasted link isn't overwritten before it has been applied
+
+function writeHash() {
+  if (!hashApplied) return;
+  const q = new URLSearchParams();
+  if (state.view === "sanctions") q.set("v", state.sColor === "reason" ? "reasons" : "sanctions");
+  if (state.windowH !== DEFAULT_WINDOW_H) q.set("w", String(state.windowH));
+  const sel = state.selection;
+  if (sel && state.cardOn && HASH_KIND[sel.kind]) {
+    q.set(HASH_KIND[sel.kind], sel.id);
+  } else {
+    const t = d3.zoomTransform(svg.node());
+    const ll = t.k > 1.01 && projection.invert([(W / 2 - t.x) / t.k, (H / 2 - t.y) / t.k]);
+    if (ll && ll.every(Number.isFinite)) q.set("m", `${ll[0].toFixed(2)},${ll[1].toFixed(2)},${t.k.toFixed(1)}`);
+  }
+  const hash = q.toString();
+  if (hash === location.hash.slice(1)) return;
+  history.replaceState(null, "", hash ? `#${hash}` : location.pathname + location.search);
+}
+
+function applyHash() {
+  const q = new URLSearchParams(location.hash.slice(1));
+  const v = q.get("v");
+  setView(v === "sanctions" || v === "reasons" ? v : q.get("c") ? "sanctions" : "strikes");
+  const w = Number(q.get("w"));
+  const windowH = WINDOWS.some((x) => x.h === w) ? w : DEFAULT_WINDOW_H;
+  if (windowH !== state.windowH) {
+    state.windowH = windowH;
+    if (matcher && state.data) rebuild(false); else render();
+  }
+  const m = (q.get("m") || "").split(",").map(Number);
+  if (q.get("e")) pick("event", q.get("e")); // an event that has since left the feed is simply not opened
+  else if (q.get("c")) focusCountry(q.get("c"));
+  else if (q.get("p")) pick("place", q.get("p"));
+  else if (m.length === 3 && m.every(Number.isFinite)) {
+    const kk = Math.min(60, Math.max(1, m[2]));
+    const [x, y] = projection([m[0], m[1]]);
+    svg.interrupt().call(zoom.transform, d3.zoomIdentity.translate(W / 2 - x * kk, H / 2 - y * kk).scale(kk));
+  }
+  hashApplied = true;
+  writeHash();
+}
+window.addEventListener("hashchange", applyHash);
+
 // ---------- start ----------
 
 async function start() {
@@ -1324,10 +1423,12 @@ async function start() {
   if (state.view === "sanctions") paintSanctions();
   await Promise.all([feed, loadFires()]);
   rebuild();
+  applyHash();
   // Satellite data changes hourly at most.
   setInterval(() => loadFires().then((ok) => { if (ok) rebuild(false); }), 30 * 60 * 1000);
   pollLive();
-  setInterval(loadFeed, POLL_S * 1000);
+  // A hidden tab doesn't download anything; it catches up when it's shown again (visibilitychange below).
+  setInterval(() => { if (!document.hidden) loadFeed(); }, POLL_S * 1000);
   setInterval(pollLive, POLL_S * 1000);
   setInterval(() => { renderFeed(); drawEvents(); updateStatus(); }, 10000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) { loadFeed(); pollLive(); } });
