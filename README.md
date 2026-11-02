@@ -2,7 +2,7 @@
 
 A live world map of reported strikes, explosions, industrial fires, wildfires and environmental incidents. A hollow orange ring marks a report from one source; a solid pink dot marks two or more independent sources. Reports are news headlines and social posts, not confirmed facts.
 
-**A personal experiment, provided as is.** Events are matched automatically from public news headlines and may be wrong, incomplete or out of date. Nothing here is verified, and it isn't news, advice or a statement of fact about any event, country or party. The author takes no responsibility for its content or for any use of it. The page says so on screen, and asks search engines not to list it. The code is under the [MIT License](LICENSE), provided "as is", without warranty of any kind.
+**Experimental. Results cannot be trusted.** Provided as is. Events are matched automatically from public news headlines and may be wrong, incomplete or out of date. Nothing here is verified, and it isn't news, advice or a statement of fact about any event, country or party. The author takes no responsibility for its content or for any use of it. The page says so on screen, and asks search engines not to list it. The code is under the [MIT License](LICENSE), provided "as is", without warranty of any kind.
 
 It's a static page: no server, build step, API keys or sign-up. GitHub Pages serves the files and everything else happens in the visitor's browser.
 
