@@ -59,9 +59,7 @@ Hover over the pill for the feed's age and when Bluesky was last checked.
 
 ### Self-audits
 
-Every Monday [`.github/workflows/audit.yml`](.github/workflows/audit.yml) runs [`scripts/audit.mjs`](scripts/audit.mjs): Claude checks a random sample of 40 accepted and 40 rejected live headlines (English only for the rejected sample) against what the rules decided, and if it suspects mistakes the workflow opens an issue listing each one with a ready-to-paste `tests/headlines.json` case. Claude's verdicts are a second opinion for a person to check; nothing on the map changes by itself. It needs an Anthropic API key stored as the repository secret `ANTHROPIC_API_KEY` (costs a few cents a week); without it the run is skipped.
-
-Before that, samples were checked by hand: ones the map accepted (right kind, place, target?) and ones it rejected despite strike words (anything missed?). Every mistake found is fixed and added to `tests/headlines.json`. All are now tests.
+Every so often a random sample of real headlines from the live feeds is checked by hand: ones the map accepted (right kind, place, target?) and ones it rejected despite strike words (anything missed?). Every mistake found is fixed and added to `tests/headlines.json`. All are now tests.
 
 | Audit | Checked | Accepted right | Missed in rejected sample |
 |---|---|---|---|
@@ -127,7 +125,7 @@ How it stays current:
 | `provinces.js` | Provinces of 21 countries (generated) |
 | `sanctions.js` | Sanctions view: hand-set levels, notes, program names, and the self-correcting rules |
 | `regions.js` | Shapes of the embargoed Ukrainian regions (from Natural Earth) |
-| `scripts/` | The generators for `cities.js` and `provinces.js`, the city skip list, the satellite and sanctions data jobs (`sanctions-lib.mjs` holds the sanctions logic), and the weekly headline audit (`audit.mjs`) |
+| `scripts/` | The generators for `cities.js` and `provinces.js`, the city skip list, the satellite and sanctions data jobs (`sanctions-lib.mjs` holds the sanctions logic) |
 
 To regenerate `provinces.js`, download `ne_10m_admin_1_label_points_details.geojson` from [Natural Earth's repository](https://github.com/nvkelso/natural-earth-vector/tree/master/geojson) and run `powershell -File scripts\build-provinces.ps1 -Points <that file>`. The country list and the suffix-only names are at the top of the script.
 
